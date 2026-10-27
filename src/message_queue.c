@@ -1,4 +1,3 @@
-// message_queue.c
 #include "message_queue.h"
 #include <stdio.h>
 #include <stdlib.h>
