@@ -1,6 +1,5 @@
-# Lister les fichiers sources (.c)
-set(SOURCES
-    main.c
+# Modules du réseau de stations (tout sauf le point d'entrée)
+set(IPC_MODULE_SOURCES
     allocator.c
     charger.c
     message_queue.c
@@ -10,14 +9,13 @@ set(SOURCES
     vehicle.c
 )
 
-# Créer l'exécutable final
-add_executable(ipc_station_app ${SOURCES})
+# Bibliothèque statique regroupant les modules, réutilisable par les tests
+add_library(ipc_network STATIC ${IPC_MODULE_SOURCES})
+ipc_configure_target(ipc_network)
+target_include_directories(ipc_network PUBLIC ${IPC_INCLUDE_DIR})
+target_link_libraries(ipc_network PUBLIC Threads::Threads)
 
-# Indiquer au compilateur où trouver les fichiers .h
-# PROJECT_SOURCE_DIR pointe vers la racine du projet
-target_include_directories(ipc_station_app PRIVATE ${PROJECT_SOURCE_DIR}/include)
-
-# Ajouter des flags de compilation stricts (recommandé avec GCC)
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(ipc_station_app PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+# Exécutable final
+add_executable(ipc_station_app main.c)
+ipc_configure_target(ipc_station_app)
+target_link_libraries(ipc_station_app PRIVATE ipc_network)
