@@ -1,4 +1,6 @@
 #include <stdbool.h>
+#include "station.h"
+#include "server.h"
 
 #ifndef VEHICLE_H
 #define VEHICLE_H

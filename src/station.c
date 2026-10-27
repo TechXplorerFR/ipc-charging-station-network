@@ -18,6 +18,18 @@ void initStation(struct Station* station, int id, int numChargers, int mq_key) {
     }
 }
 
+bool hasAvailableCharger(struct Station* station) {
+    pthread_mutex_lock(&station->lock);
+    for (int i = 0; i < station->numChargers; i++) {
+        if (station->chargers[i].status == AVAILABLE) {
+            pthread_mutex_unlock(&station->lock);
+            return true;
+        }
+    }
+    pthread_mutex_unlock(&station->lock);
+    return false;
+}
+
 bool isChargerAvailable(struct Station* station, int chargerId) {
     // La vérification de disponibilité doit être protégée[cite: 6]
     pthread_mutex_lock(&station->lock);

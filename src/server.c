@@ -1,9 +1,11 @@
 #include "server.h"
+#include "station.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 //Tableau de stations 
 #define MAX_STATIONS 30
-ChargingStation charging_stations[MAX_STATIONS];
+struct Station charging_stations[MAX_STATIONS];
 
 // Fonction pour diffrentes requetes du serveur
 void handle_request(RequestType request) {
@@ -34,48 +36,40 @@ void handle_request(RequestType request) {
     }
 }
 
-
-
 void function_to_handle_charge_demand() {
     printf("[SERVEUR] Traitement de la demande de charge...\n");
-
-    //Décla Variables pour gérer les stations de charge
-    typedef struct {
-        int charge_station_id;
-        bool is_available;
-    } ChargingStation;
 
     int available_station_index = -1;
 
     for (int i = 0; i < MAX_STATIONS; i++) {
-        if (charging_stations[i].is_available) {
+        if (charging_stations[i].hasAvailableCharger(&charging_stations[i])) {
             available_station_index = i;
             break;
         }
     }
 
     if (available_station_index != -1) {
-        printf("[SERVEUR] Borne de recharge %d attribuée au véhicule.\n", charging_stations[available_station_index].charge_station_id);
+        printf("[SERVEUR] Borne de recharge %d attribuée au véhicule.\n", charging_stations[available_station_index].id);
 
     } else {
         printf("[SERVEUR] Aucune borne de recharge disponible pour le moment.\n");
     }
-
+}
 
 void function_to_handle_charge_end() {
     printf("[SERVEUR] Traitement de la fin de charge...\n");
 
     int free_station_index = -1;
     for (int i = 0; i < MAX_STATIONS; i++) {
-        if (!charging_stations[i].is_available) {
+        if (charging_stations[i].hasAvailableCharger(&charging_stations[i])) {
             free_station_index = i;
             break;
         }
     }
 
     if (free_station_index != -1) {
-        charging_stations[free_station_index].is_available = true;
-        printf("[SERVEUR] Borne de recharge %d libérée.\n", charging_stations[free_station_index].charge_station_id);
+        charging_stations[free_station_index].hasAvailableCharger = true;
+        printf("[SERVEUR] Borne de recharge %d libérée.\n", charging_stations[free_station_index].id);
 
         //TODO Attribuer Vehicule en attente à la borne libérée
 
@@ -92,8 +86,8 @@ void function_to_handle_alert() {
 
 
     for (int i = 0; i < MAX_STATIONS; i++) {
-        if (!charging_stations[i].is_available) {
-            printf("[SERVEUR] Alerte : Borne de recharge %d signale une panne !\n", charging_stations[i].charge_station_id);
+        if (!charging_stations[i].hasAvailableCharger(&charging_stations[i])) {
+            printf("[SERVEUR] Alerte : Borne de recharge %d signale une panne !\n", charging_stations[i].id);
             alert_handled = true;
             break;
         }
