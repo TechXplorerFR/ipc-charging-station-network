@@ -13,9 +13,10 @@ struct Vehicle {
     int id;
     VehicleType type;
     unsigned int capacity;
+    unsigned int currentCharge; // Niveau de charge initial
     int maxPower;
     char* destination;
-    bool isPrioritary;
+    bool isPrioritary; // Permet de gérer la file d'attente prioritaire
 };
 
 struct Vehicle* createVehicle(int id, VehicleType type, unsigned int capacity, int maxPower, const char* destination);

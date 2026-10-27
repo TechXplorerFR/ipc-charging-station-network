@@ -1,11 +1,10 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-
-typedef enum {
-
-}
-
+typedef struct Server {
+    int id;
+    struct Station* station;
+} Server;
 
 
 

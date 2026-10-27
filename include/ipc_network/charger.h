@@ -16,6 +16,7 @@ struct Charger
     int id;
     int maxPower;
     AvailabiltyStatus status;
+    
 };
 
 
