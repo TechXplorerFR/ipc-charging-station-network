@@ -1,119 +1,114 @@
 #include "server.h"
-#include "station.h"
+#include "allocator.h"
 #include <stdio.h>
-#include <stdlib.h>
 
-//Tableau de stations 
-#define MAX_STATIONS 30
-struct Station charging_stations[MAX_STATIONS];
+// Renvoie la station visée par une requête, ou NULL si son identifiant est invalide
+static struct Station* findStation(struct Server* server, int stationId) {
+    if (stationId < 0 || stationId >= server->numStations) {
+        printf("[SERVEUR] Erreur : station %d inconnue.\n", stationId);
+        return NULL;
+    }
+    return &server->stations[stationId];
+}
 
-// Fonction pour diffrentes requetes du serveur
-void handle_request(RequestType request) {
-    switch (request) {
+static void handleChargeDemand(struct Server* server, const Message* msg) {
+    struct Station* station = findStation(server, msg->station_id);
+    if (station == NULL) {
+        return;
+    }
+
+    printf("[SERVEUR] Véhicule %d : demande de charge sur la station %d.\n", msg->vehicle_id, station->id);
+    int chargerIndex = assignChargerAtomically(station, msg->vehicle_id);
+    if (chargerIndex != -1) {
+        // TODO Envoyer la confirmation d'attribution au véhicule
+    } else {
+        printf("[SERVEUR] Aucune borne libre sur la station %d.\n", station->id);
+        // TODO Mettre le véhicule en file d'attente
+    }
+}
+
+static void handleChargeEnd(struct Server* server, const Message* msg) {
+    struct Station* station = findStation(server, msg->station_id);
+    if (station == NULL) {
+        return;
+    }
+
+    if (releaseCharger(station, msg->charger_id)) {
+        printf("[SERVEUR] Borne %d de la station %d libérée.\n", msg->charger_id, station->id);
+        // TODO Attribuer la borne libérée au prochain véhicule en attente
+    } else {
+        printf("[SERVEUR] Erreur : la borne %d de la station %d n'était pas occupée.\n", msg->charger_id, station->id);
+    }
+}
+
+static void handleAlert(struct Server* server, const Message* msg) {
+    struct Station* station = findStation(server, msg->station_id);
+    if (station == NULL) {
+        return;
+    }
+    if (!isValidCharger(station, msg->charger_id)) {
+        printf("[SERVEUR] Erreur : borne %d inconnue sur la station %d.\n", msg->charger_id, station->id);
+        return;
+    }
+
+    lockStation(station);
+    bool wasOccupied = station->chargers[msg->charger_id].status == OCCUPIED;
+    setStationChargerStatus(station, msg->charger_id, OUT_OF_SERVICE);
+    unlockStation(station);
+
+    printf("[SERVEUR] ALERTE : borne %d de la station %d en panne.\n", msg->charger_id, station->id);
+    if (wasOccupied) {
+        // TODO Notifier le véhicule en charge et le rediriger si possible
+    }
+}
+
+bool initServer(struct Server* server, int numStations, int chargersPerStation, key_t firstQueueKey) {
+    server->numStations = 0;
+    if (numStations > MAX_STATIONS) {
+        printf("[SERVEUR] Erreur : %d stations demandées, maximum %d.\n", numStations, MAX_STATIONS);
+        return false;
+    }
+
+    for (int i = 0; i < numStations; i++) {
+        if (!initStation(&server->stations[i], i, chargersPerStation, firstQueueKey + i)) {
+            shutdownServer(server);
+            return false;
+        }
+        server->numStations++;
+    }
+    return true;
+}
+
+void shutdownServer(struct Server* server) {
+    printf("[SERVEUR] Libération des ressources IPC...\n");
+    for (int i = 0; i < server->numStations; i++) {
+        destroyStation(&server->stations[i]);
+    }
+    server->numStations = 0;
+    // TODO Fermer la file de requêtes du serveur
+}
+
+bool handleRequest(struct Server* server, const Message* msg) {
+    switch (msg->request) {
         case REQ_CHARGE_DEMAND:
-            printf("[SERVEUR] Un véhicule demande une borne de recharge.\n");
-            function_to_handle_charge_demand();
+            handleChargeDemand(server, msg);
             break;
 
         case REQ_CHARGE_END:
-            printf("[SERVEUR] Un véhicule a fini de charger et libère la borne.\n");
-            function_to_handle_charge_end();
+            handleChargeEnd(server, msg);
             break;
 
         case REQ_ALERT:
-            printf("[SERVEUR] ALERTE : Une borne signale une panne !\n");
-            function_to_handle_alert();
+            handleAlert(server, msg);
             break;
 
         case REQ_SHUTDOWN:
-            printf("[SERVEUR] Arrêt propre du serveur demandé.\n");
-            function_to_shutdown_server(); 
-            break;
+            printf("[SERVEUR] Arrêt du serveur demandé.\n");
+            return false;
 
         default:
-            printf("[SERVEUR] Erreur : Type de requête inconnu.\n");
+            printf("[SERVEUR] Erreur : type de requête %d inconnu.\n", msg->request);
             break;
     }
-}
-
-void function_to_handle_charge_demand(void) {
-    printf("[SERVEUR] Traitement de la demande de charge...\n");
-
-    int available_station_index = -1;
-
-    for (int i = 0; i < MAX_STATIONS; i++) {
-        if (hasAvailableCharger(&charging_stations[i])) {
-            available_station_index = i;
-            break;
-        }
-    }
-
-    if (available_station_index != -1) {
-        printf("[SERVEUR] Borne de recharge %d attribuée au véhicule.\n", charging_stations[available_station_index].id);
-
-    } else {
-        printf("[SERVEUR] Aucune borne de recharge disponible pour le moment.\n");
-    }
-}
-
-void function_to_handle_charge_end(void) {
-    printf("[SERVEUR] Traitement de la fin de charge...\n");
-
-    // Recherche d'une borne occupée à libérer
-    int free_station_index = -1;
-    int free_charger_index = -1;
-    for (int i = 0; i < MAX_STATIONS && free_station_index == -1; i++) {
-        pthread_mutex_lock(&charging_stations[i].lock);
-        for (int j = 0; j < charging_stations[i].numChargers; j++) {
-            if (charging_stations[i].chargers[j].status == OCCUPIED) {
-                charging_stations[i].chargers[j].status = AVAILABLE;
-                free_station_index = i;
-                free_charger_index = j;
-                break;
-            }
-        }
-        pthread_mutex_unlock(&charging_stations[i].lock);
-    }
-
-    if (free_station_index != -1) {
-        printf("[SERVEUR] Borne %d de la station %d libérée.\n", free_charger_index, charging_stations[free_station_index].id);
-
-        //TODO Attribuer Vehicule en attente à la borne libérée
-
-    } else {
-        printf("[SERVEUR] Aucune borne de recharge n'était occupée.\n");
-    }
-
-}
-
-void function_to_handle_alert(void) {
-    printf("[SERVEUR] Traitement de l'alerte...\n");
-
-    bool alert_handled = false;
-
-
-    for (int i = 0; i < MAX_STATIONS; i++) {
-        if (!hasAvailableCharger(&charging_stations[i])) {
-            printf("[SERVEUR] Alerte : Borne de recharge %d signale une panne !\n", charging_stations[i].id);
-            alert_handled = true;
-            break;
-        }
-    }
-
-    if (!alert_handled) {
-        printf("[SERVEUR] Aucune alerte à traiter.\n");
-    }
-}
-
-
-void function_to_shutdown_server(void) {
-    printf("[SERVEUR] Procédure d'arrêt en cours...\n");
-
-    // 1. TODO: Supprimer les sémaphores
-    // 2. TODO: Fermer les files de messages
-    // 3. TODO: Libérer les éventuels blocs de mémoire
-
-    printf("[SERVEUR] Ressources IPC et mémoire nettoyées avec succès. Arrêt définitif.\n");
-    
-    exit(0); 
+    return true;
 }

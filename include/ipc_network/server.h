@@ -1,30 +1,21 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-typedef struct Server {
-    int id;
-    struct Station* station;
-} Server;
+#include <stdbool.h>
+#include "message_queue.h"
+#include "station.h"
 
-// Types de requêtes traitées par le serveur
-typedef enum {
-    REQ_CHARGE_DEMAND,
-    REQ_CHARGE_END,
-    REQ_ALERT,
-    REQ_SHUTDOWN
-} RequestType;
+#define MAX_STATIONS 30
 
-void handle_request(RequestType request);
-void function_to_handle_charge_demand(void);
-void function_to_handle_charge_end(void);
-void function_to_handle_alert(void);
-void function_to_shutdown_server(void);
+struct Server {
+    struct Station stations[MAX_STATIONS]; // L'identifiant d'une station est son indice
+    int numStations;
+};
 
+bool initServer(struct Server* server, int numStations, int chargersPerStation, key_t firstQueueKey);
+void shutdownServer(struct Server* server);
 
-
-
-
-
-
+// Traite une requête reçue ; renvoie false lorsque le serveur doit s'arrêter
+bool handleRequest(struct Server* server, const Message* msg);
 
 #endif // SERVER_H

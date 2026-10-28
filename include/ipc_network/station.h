@@ -1,22 +1,30 @@
 #ifndef STATION_H
 #define STATION_H
 
-#include <pthread.h>
 #include <stdbool.h>
-#include "message_queue.h" // IPC pour les requêtes
 #include "charger.h"
-#include "vehicle.h"
+#include "message_queue.h"
 
 struct Station {
     int id;
     struct Charger* chargers;
     int numChargers;
-    msgq_t waitQueue; 
-    pthread_mutex_t lock; // Protège l'accès concurrent aux bornes de cette station
+    msgq_t waitQueue; // File d'attente des véhicules de la station
+    int semId;        // Sémaphores System V : verrou des bornes + compteur de bornes libres
 };
 
-void initStation(struct Station* station, int id, int numChargers, int mq_key);
-bool assignChargerAtomically(struct Station* station, struct Vehicle* vehicle);
+bool initStation(struct Station* station, int id, int numChargers, key_t mqKey);
+void destroyStation(struct Station* station);
+
+// Section critique sur l'état des bornes de la station
+void lockStation(struct Station* station);
+void unlockStation(struct Station* station);
+
+// À appeler verrou acquis : change l'état d'une borne et tient à jour le compteur de bornes libres
+void setStationChargerStatus(struct Station* station, int chargerIndex, ChargerStatus status);
+
+bool isValidCharger(const struct Station* station, int chargerIndex);
 bool hasAvailableCharger(struct Station* station);
+bool isChargerAvailable(struct Station* station, int chargerIndex);
 
 #endif // STATION_H

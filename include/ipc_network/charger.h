@@ -1,24 +1,21 @@
-#include <stdbool.h>
-
 #ifndef CHARGER_H
 #define CHARGER_H
 
-typedef enum
-{
+typedef enum {
     AVAILABLE,
     OCCUPIED,
     OUT_OF_SERVICE,
     MAINTENANCE
-} AvailabiltyStatus;
+} ChargerStatus;
 
-struct Charger
-{
+struct Charger {
     int id;
-    int maxPower;
-    AvailabiltyStatus status;
-    
+    int maxPower; // kW
+    ChargerStatus status;
 };
 
-
+// Modifie l'état brut de la borne, sans toucher aux sémaphores de la station :
+// depuis l'extérieur de station.c, passer par setStationChargerStatus()
+void setChargerStatus(struct Charger* charger, ChargerStatus newStatus);
 
 #endif // CHARGER_H
