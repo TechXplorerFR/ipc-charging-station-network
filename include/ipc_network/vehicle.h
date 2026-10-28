@@ -21,9 +21,9 @@ struct Vehicle {
     bool isPrioritary; // Permet de gérer la file d'attente prioritaire
 };
 
-struct Vehicle* createVehicle(int id, VehicleType type, unsigned int capacity, int maxPower, const char* destination);
+struct Vehicle* createVehicle(int id, VehicleType type, unsigned int capacity, int maxPower, const char* destination, bool prioritary);
 void charge(struct Vehicle* vehicle, int power);
-void sendChargeRequest(struct Station* station, struct Vehicle* vehicle, int desiredPower);
+void sendChargeRequest(msgq_t serverQueue, struct Vehicle* vehicle, int stationId, int desiredPower);
 void respondToPing(struct Server* server, struct Vehicle* vehicle);
 
 #endif // VEHICLE_H
