@@ -44,7 +44,7 @@
 
 # Kernel Module Compile Results
 *.mod*
-*.cmd
+# *.cmd
 .tmp_versions/
 modules.order
 Module.symvers
@@ -53,3 +53,6 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Dossier de compilation
+build/
