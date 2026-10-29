@@ -43,6 +43,26 @@ static void testPrioritaryVehiclesGoFirst(void) {
     CHECK(dequeueId(&queue) == 3);
 }
 
+static void testEnqueueFirstStaysBehindHigherPriority(void) {
+    struct WaitQueue queue;
+    initWaitQueue(&queue);
+    CHECK(enqueue(&queue, 1, PRIORITY_NORMAL));
+    CHECK(enqueue(&queue, 2, PRIORITY_HIGH));
+    CHECK(enqueue(&queue, 3, PRIORITY_NORMAL));
+
+    struct WaitingVehicle interrupted = { .vehicleId = 4, .desiredPower = 50, .priority = PRIORITY_NORMAL };
+    CHECK(enqueueVehicleFirst(&queue, &interrupted));
+    struct WaitingVehicle interruptedPrioritary = { .vehicleId = 5, .desiredPower = 50, .priority = PRIORITY_HIGH };
+    CHECK(enqueueVehicleFirst(&queue, &interruptedPrioritary));
+    CHECK(!enqueueVehicleFirst(&queue, &interrupted));
+
+    CHECK(dequeueId(&queue) == 5);
+    CHECK(dequeueId(&queue) == 2);
+    CHECK(dequeueId(&queue) == 4);
+    CHECK(dequeueId(&queue) == 1);
+    CHECK(dequeueId(&queue) == 3);
+}
+
 static void testRemoveWaitingVehicle(void) {
     struct WaitQueue queue;
     initWaitQueue(&queue);
@@ -82,6 +102,7 @@ static void testWaitingTimeStartsAtEnqueue(void) {
 int main(void) {
     RUN_TEST(testFirstComeFirstServedAtSamePriority);
     RUN_TEST(testPrioritaryVehiclesGoFirst);
+    RUN_TEST(testEnqueueFirstStaysBehindHigherPriority);
     RUN_TEST(testRemoveWaitingVehicle);
     RUN_TEST(testRejectsDuplicatesAndOverflow);
     RUN_TEST(testWaitingTimeStartsAtEnqueue);

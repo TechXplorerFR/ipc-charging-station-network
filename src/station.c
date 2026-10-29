@@ -37,7 +37,7 @@ bool initStation(struct Station* station, int id, int numChargers) {
         station->chargers[i].id = i;
         station->chargers[i].maxPower = 50; // Exemple : 50 kW
         station->chargers[i].status = AVAILABLE;
-        station->chargers[i].vehicleId = NO_VEHICLE;
+        station->chargers[i].session = (struct ChargingSession){ .vehicleId = NO_VEHICLE };
     }
 
     initWaitQueue(&station->waitQueue);

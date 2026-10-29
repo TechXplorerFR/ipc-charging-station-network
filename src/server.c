@@ -49,21 +49,24 @@ static void handleChargeEnd(struct Server* server, const Message* msg) {
         return;
     }
 
+    struct ChargingSession finished;
     struct WaitingVehicle next;
-    switch (releaseChargerAndServeQueue(station, msg->charger_id, &next)) {
-        case HANDOVER_FREED:
-            printf("[SERVEUR] Borne %d de la station %d libérée.\n", msg->charger_id, station->id);
-            break;
+    HandoverResult result = releaseChargerAndServeQueue(station, msg->charger_id, &finished, &next);
+    if (result == HANDOVER_INVALID) {
+        printf("[SERVEUR] Erreur : la borne %d de la station %d n'était pas occupée.\n", msg->charger_id, station->id);
+        return;
+    }
 
-        case HANDOVER_REASSIGNED:
-            printf("[SERVEUR] Borne %d de la station %d attribuée au véhicule %d (attente : %.1f s).\n",
-                   msg->charger_id, station->id, next.vehicleId, waitingTimeSeconds(&next));
-            // TODO Envoyer RESP_ASSIGNED au véhicule next.vehicleId
-            break;
+    printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d.\n",
+           finished.vehicleId, msg->charger_id, station->id);
+    // TODO Facturer la session terminée (finished) et l'enregistrer dans l'historique
 
-        case HANDOVER_INVALID:
-            printf("[SERVEUR] Erreur : la borne %d de la station %d n'était pas occupée.\n", msg->charger_id, station->id);
-            break;
+    if (result == HANDOVER_REASSIGNED) {
+        printf("[SERVEUR] Borne %d de la station %d attribuée au véhicule %d (attente : %.1f s).\n",
+               msg->charger_id, station->id, next.vehicleId, waitingTimeSeconds(&next));
+        // TODO Envoyer RESP_ASSIGNED au véhicule next.vehicleId
+    } else {
+        printf("[SERVEUR] Borne %d de la station %d libérée.\n", msg->charger_id, station->id);
     }
 }
 
@@ -90,11 +93,34 @@ static void handleAlert(struct Server* server, const Message* msg) {
         return;
     }
 
-    int interruptedVehicle = takeChargerOutOfService(station, msg->charger_id, OUT_OF_SERVICE);
+    struct ChargingSession interrupted;
+    bool wasCharging = takeChargerOutOfService(station, msg->charger_id, OUT_OF_SERVICE, &interrupted);
 
     printf("[SERVEUR] ALERTE : borne %d de la station %d en panne.\n", msg->charger_id, station->id);
-    if (interruptedVehicle != NO_VEHICLE) {
-        // TODO Notifier le véhicule interruptedVehicle (NOTIF_FAULT) et le rediriger si possible
+    if (!wasCharging) {
+        return;
+    }
+
+    // TODO Facturer la session interrompue et prévenir le véhicule (NOTIF_FAULT)
+    struct Assignment redirection = redirectInterruptedVehicle(station, &interrupted);
+    switch (redirection.result) {
+        case ASSIGN_OK:
+            printf("[SERVEUR] Véhicule %d : redirigé vers la borne %d.\n", interrupted.vehicleId,
+                   redirection.chargerIndex);
+            // TODO Envoyer RESP_ASSIGNED au véhicule
+            break;
+
+        case ASSIGN_QUEUED:
+            printf("[SERVEUR] Véhicule %d : replacé en file d'attente (position %d).\n", interrupted.vehicleId,
+                   redirection.queuePosition);
+            // TODO Envoyer RESP_QUEUED au véhicule
+            break;
+
+        case ASSIGN_REFUSED:
+            printf("[SERVEUR] Véhicule %d : aucune redirection possible sur la station %d.\n", interrupted.vehicleId,
+                   station->id);
+            // TODO Essayer une autre station, sinon envoyer RESP_REFUSED au véhicule
+            break;
     }
 }
 

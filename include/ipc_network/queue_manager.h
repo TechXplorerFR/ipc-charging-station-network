@@ -33,6 +33,10 @@ void initWaitQueue(struct WaitQueue* queue);
 // renvoie false si la file est pleine ou si le véhicule y est déjà
 bool enqueueVehicle(struct WaitQueue* queue, const struct WaitingVehicle* vehicle);
 
+// Comme enqueueVehicle, mais devant les véhicules de même priorité (toujours derrière ceux de priorité
+// supérieure) : pour un véhicule dont la recharge a été interrompue par une panne
+bool enqueueVehicleFirst(struct WaitQueue* queue, const struct WaitingVehicle* vehicle);
+
 // Retire le prochain véhicule à servir et le copie dans *next ; renvoie false si la file est vide
 bool dequeueNextVehicle(struct WaitQueue* queue, struct WaitingVehicle* next);
 

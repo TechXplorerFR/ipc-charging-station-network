@@ -12,14 +12,17 @@ void initWaitQueue(struct WaitQueue* queue) {
     queue->count = 0;
 }
 
-bool enqueueVehicle(struct WaitQueue* queue, const struct WaitingVehicle* vehicle) {
+// Insère le véhicule derrière ceux de priorité supérieure ; aheadOfSamePriority le place
+// devant ceux de même priorité au lieu de derrière
+static bool insertVehicle(struct WaitQueue* queue, const struct WaitingVehicle* vehicle, bool aheadOfSamePriority) {
     if (queue->count >= MAX_WAITING_VEHICLES || waitQueuePosition(queue, vehicle->vehicleId) != -1) {
         return false;
     }
 
-    // Insertion devant le premier véhicule moins prioritaire : l'ordre d'arrivée est conservé à priorité égale
     int insertAt = 0;
-    while (insertAt < queue->count && queue->vehicles[insertAt].priority >= vehicle->priority) {
+    while (insertAt < queue->count
+           && (queue->vehicles[insertAt].priority > vehicle->priority
+               || (!aheadOfSamePriority && queue->vehicles[insertAt].priority == vehicle->priority))) {
         insertAt++;
     }
 
@@ -29,6 +32,14 @@ bool enqueueVehicle(struct WaitQueue* queue, const struct WaitingVehicle* vehicl
     clock_gettime(CLOCK_MONOTONIC, &queue->vehicles[insertAt].arrivalTime);
     queue->count++;
     return true;
+}
+
+bool enqueueVehicle(struct WaitQueue* queue, const struct WaitingVehicle* vehicle) {
+    return insertVehicle(queue, vehicle, false);
+}
+
+bool enqueueVehicleFirst(struct WaitQueue* queue, const struct WaitingVehicle* vehicle) {
+    return insertVehicle(queue, vehicle, true);
 }
 
 bool dequeueNextVehicle(struct WaitQueue* queue, struct WaitingVehicle* next) {
