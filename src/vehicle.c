@@ -18,6 +18,7 @@ struct Vehicle* createVehicle(int id, VehicleType type, unsigned int capacity, u
         free(v);
         return NULL;
     }
+
     v->id = id;
     v->type = type;
     v->capacity = capacity;
