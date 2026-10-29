@@ -26,7 +26,7 @@ typedef enum {
     REQ_PONG,   // Réponse à NOTIF_PING, avec le niveau de batterie
 
     // Serveur -> véhicule
-    RESP_ASSIGNED,  // Borne attribuée (charger_id)
+    RESP_ASSIGNED,  // Borne attribuée (station_id, charger_id, desired_power = puissance délivrée)
     RESP_QUEUED,    // Placé en file d'attente (queue_position)
     RESP_REFUSED,   // Aucune borne libre et file d'attente pleine
     NOTIF_PING,     // Demande de l'état de la charge
@@ -40,7 +40,7 @@ typedef struct {
     int vehicle_id;
     int station_id;
     int charger_id;         // Borne concernée (attribution, fin de charge, alerte), -1 sinon
-    int desired_power;      // kW
+    int desired_power;      // kW demandés (REQ_CHARGE_DEMAND) ou délivrés par la borne attribuée (RESP_ASSIGNED)
     int estimated_duration; // Durée de charge estimée (s)
     int battery_level;      // Niveau de batterie (%), renseigné dans REQ_PONG
     int queue_position;     // Position dans la file d'attente (1 = prochain servi), renseignée dans RESP_QUEUED

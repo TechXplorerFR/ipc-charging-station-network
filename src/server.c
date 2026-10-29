@@ -57,8 +57,8 @@ static void handleChargeEnd(struct Server* server, const Message* msg) {
         return;
     }
 
-    printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d.\n",
-           finished.vehicleId, msg->charger_id, station->id);
+    printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d (%.1f kWh).\n",
+           finished.vehicleId, msg->charger_id, station->id, sessionEnergyKWh(&finished));
     // TODO Facturer la session terminée (finished) et l'enregistrer dans l'historique
 
     if (result == HANDOVER_REASSIGNED) {

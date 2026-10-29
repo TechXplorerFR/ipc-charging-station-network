@@ -28,17 +28,14 @@ static int findBestCharger(const struct Station* station, int desiredPower) {
 // Verrou acquis : la borne passe à OCCUPIED et une session de recharge démarre pour le véhicule
 static void occupyCharger(struct Station* station, int chargerIndex, const struct WaitingVehicle* vehicle) {
     setStationChargerStatus(station, chargerIndex, OCCUPIED);
-
-    struct ChargingSession* session = &station->chargers[chargerIndex].session;
-    session->vehicleId = vehicle->vehicleId;
-    session->desiredPower = vehicle->desiredPower;
-    session->isPrioritary = vehicle->priority == PRIORITY_HIGH;
-    clock_gettime(CLOCK_MONOTONIC, &session->start);
+    startChargingSession(&station->chargers[chargerIndex], vehicle->vehicleId, vehicle->desiredPower,
+                         vehicle->priority == PRIORITY_HIGH);
 }
 
-// Verrou acquis
-static void clearSession(struct Charger* charger) {
-    charger->session = (struct ChargingSession){ .vehicleId = NO_VEHICLE };
+// Verrou acquis : copie la session de la borne dans *ended, figée à l'instant présent
+static void copyEndedSession(const struct Charger* charger, struct ChargingSession* ended) {
+    *ended = charger->session;
+    endChargingSession(ended);
 }
 
 // Verrou acquis, sur une borne qui redevient utilisable : la donne au prochain véhicule en attente
@@ -50,7 +47,7 @@ static HandoverResult handOverCharger(struct Station* station, int chargerIndex,
         return HANDOVER_REASSIGNED;
     }
     setStationChargerStatus(station, chargerIndex, AVAILABLE);
-    clearSession(&station->chargers[chargerIndex]);
+    clearChargingSession(&station->chargers[chargerIndex]);
     return HANDOVER_FREED;
 }
 
@@ -81,10 +78,6 @@ static struct Assignment assignOrEnqueue(struct Station* station, const struct W
     return assignment;
 }
 
-static bool isOutOfOrder(ChargerStatus status) {
-    return status == OUT_OF_SERVICE || status == MAINTENANCE;
-}
-
 struct Assignment requestCharger(struct Station* station, const struct WaitingVehicle* vehicle) {
     return assignOrEnqueue(station, vehicle, false);
 }
@@ -98,7 +91,7 @@ HandoverResult releaseChargerAndServeQueue(struct Station* station, int chargerI
     lockStation(station);
     HandoverResult result = HANDOVER_INVALID;
     if (station->chargers[chargerIndex].status == OCCUPIED) {
-        *finished = station->chargers[chargerIndex].session;
+        copyEndedSession(&station->chargers[chargerIndex], finished);
         result = handOverCharger(station, chargerIndex, next);
     }
     unlockStation(station);
@@ -112,7 +105,7 @@ HandoverResult repairChargerAndServeQueue(struct Station* station, int chargerIn
 
     lockStation(station);
     HandoverResult result = HANDOVER_INVALID;
-    if (isOutOfOrder(station->chargers[chargerIndex].status)) {
+    if (isChargerOutOfOrder(station->chargers[chargerIndex].status)) {
         result = handOverCharger(station, chargerIndex, next);
     }
     unlockStation(station);
@@ -121,7 +114,7 @@ HandoverResult repairChargerAndServeQueue(struct Station* station, int chargerIn
 
 bool takeChargerOutOfService(struct Station* station, int chargerIndex, ChargerStatus status,
                              struct ChargingSession* interrupted) {
-    if (!isValidCharger(station, chargerIndex) || !isOutOfOrder(status)) {
+    if (!isValidCharger(station, chargerIndex) || !isChargerOutOfOrder(status)) {
         return false;
     }
 
@@ -129,10 +122,10 @@ bool takeChargerOutOfService(struct Station* station, int chargerIndex, ChargerS
     struct Charger* charger = &station->chargers[chargerIndex];
     bool wasCharging = charger->status == OCCUPIED;
     if (wasCharging) {
-        *interrupted = charger->session;
+        copyEndedSession(charger, interrupted);
     }
     setStationChargerStatus(station, chargerIndex, status);
-    clearSession(charger);
+    clearChargingSession(charger);
     unlockStation(station);
     return wasCharging;
 }
