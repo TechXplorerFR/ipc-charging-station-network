@@ -3,17 +3,17 @@
 
 #include <stdbool.h>
 #include "charger.h"
-#include "message_queue.h"
+#include "queue_manager.h"
 
 struct Station {
     int id;
     struct Charger* chargers;
     int numChargers;
-    msgq_t waitQueue; // File d'attente des véhicules de la station
-    int semId;        // Sémaphores System V : verrou des bornes + compteur de bornes libres
+    struct WaitQueue waitQueue; // File d'attente des véhicules de la station, protégée par le verrou
+    int semId;                  // Sémaphores System V : verrou des bornes + compteur de bornes libres
 };
 
-bool initStation(struct Station* station, int id, int numChargers, key_t mqKey);
+bool initStation(struct Station* station, int id, int numChargers);
 void destroyStation(struct Station* station);
 
 // Section critique sur l'état des bornes de la station
