@@ -31,7 +31,9 @@ typedef enum {
 struct Assignment requestCharger(struct Station* station, const struct WaitingVehicle* vehicle);
 
 // Fin de charge sur une borne occupée : la session terminée est copiée dans *finished (pour la facturation),
-// puis la borne passe au prochain véhicule en attente (copié dans *next), sinon elle redevient libre
+// puis la borne passe au prochain véhicule en attente (copié dans *next), sinon elle redevient libre.
+// Avant de choisir, les véhicules qui attendent depuis PRIORITY_AGING_SECONDS deviennent prioritaires
+// (de même pour repairChargerAndServeQueue).
 HandoverResult releaseChargerAndServeQueue(struct Station* station, int chargerIndex,
                                            struct ChargingSession* finished, struct WaitingVehicle* next);
 
@@ -52,5 +54,11 @@ struct Assignment redirectInterruptedVehicle(struct Station* station, const stru
 
 // Retire un véhicule de la file d'attente ; renvoie false s'il n'y était pas
 bool cancelWaitingVehicle(struct Station* station, int vehicleId);
+
+// À appeler périodiquement (par exemple avec MAX_WAIT_SECONDS) : retire au plus capacity véhicules
+// qui attendent depuis trop longtemps et les copie dans expired (à prévenir par RESP_REFUSED) ;
+// renvoie leur nombre
+int expireWaitingVehicles(struct Station* station, double maxWaitSeconds, struct WaitingVehicle* expired,
+                          int capacity);
 
 #endif // ALLOCATOR_H

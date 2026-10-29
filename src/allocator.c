@@ -41,9 +41,10 @@ static void clearSession(struct Charger* charger) {
     charger->session = (struct ChargingSession){ .vehicleId = NO_VEHICLE };
 }
 
-// Verrou acquis, sur une borne qui redevient utilisable : la donne au prochain véhicule en attente,
-// sinon la libère
+// Verrou acquis, sur une borne qui redevient utilisable : la donne au prochain véhicule en attente
+// (après promotion des véhicules qui attendent depuis trop longtemps), sinon la libère
 static HandoverResult handOverCharger(struct Station* station, int chargerIndex, struct WaitingVehicle* next) {
+    promoteLongWaitingVehicles(&station->waitQueue, PRIORITY_AGING_SECONDS);
     if (dequeueNextVehicle(&station->waitQueue, next)) {
         occupyCharger(station, chargerIndex, next);
         return HANDOVER_REASSIGNED;
@@ -148,6 +149,14 @@ struct Assignment redirectInterruptedVehicle(struct Station* station, const stru
 bool cancelWaitingVehicle(struct Station* station, int vehicleId) {
     lockStation(station);
     bool removed = removeWaitingVehicle(&station->waitQueue, vehicleId);
+    unlockStation(station);
+    return removed;
+}
+
+int expireWaitingVehicles(struct Station* station, double maxWaitSeconds, struct WaitingVehicle* expired,
+                          int capacity) {
+    lockStation(station);
+    int removed = removeExpiredVehicles(&station->waitQueue, maxWaitSeconds, expired, capacity);
     unlockStation(station);
     return removed;
 }

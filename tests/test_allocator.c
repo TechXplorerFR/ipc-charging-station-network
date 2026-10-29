@@ -245,6 +245,45 @@ static void testCancelWaitingVehicle(void) {
     destroyStation(&station);
 }
 
+static void testLongWaitingVehicleServedBeforeLaterPrioritary(void) {
+    struct Station station;
+    if (!initTestStation(&station)) {
+        CHECK(false);
+        return;
+    }
+    fillStation(&station);
+    request(&station, 10, 50, PRIORITY_NORMAL);
+    station.waitQueue.vehicles[0].arrivalTime.tv_sec -= 100; // Attente simulée de 100 s
+    request(&station, 11, 50, PRIORITY_HIGH);
+
+    struct ChargingSession finished;
+    struct WaitingVehicle next;
+    CHECK(releaseChargerAndServeQueue(&station, 1, &finished, &next) == HANDOVER_REASSIGNED);
+    CHECK(next.vehicleId == 10);
+    CHECK(waitQueuePosition(&station.waitQueue, 11) == 1);
+
+    destroyStation(&station);
+}
+
+static void testExpireWaitingVehicles(void) {
+    struct Station station;
+    if (!initTestStation(&station)) {
+        CHECK(false);
+        return;
+    }
+    fillStation(&station);
+    request(&station, 10, 50, PRIORITY_NORMAL);
+    request(&station, 11, 50, PRIORITY_NORMAL);
+    station.waitQueue.vehicles[0].arrivalTime.tv_sec -= 400;
+
+    struct WaitingVehicle expired[MAX_WAITING_VEHICLES];
+    CHECK(expireWaitingVehicles(&station, MAX_WAIT_SECONDS, expired, MAX_WAITING_VEHICLES) == 1);
+    CHECK(expired[0].vehicleId == 10);
+    CHECK(waitQueuePosition(&station.waitQueue, 11) == 1);
+
+    destroyStation(&station);
+}
+
 // Nombre de véhicules (threads) qui demandent une borne en même temps
 #define CONCURRENT_VEHICLES 32
 
@@ -301,6 +340,8 @@ int main(void) {
     RUN_TEST(testRedirectToAnotherFreeCharger);
     RUN_TEST(testRedirectAheadOfSamePriority);
     RUN_TEST(testCancelWaitingVehicle);
+    RUN_TEST(testLongWaitingVehicleServedBeforeLaterPrioritary);
+    RUN_TEST(testExpireWaitingVehicles);
     RUN_TEST(testConcurrentRequestsNeverShareACharger);
     return TEST_RESULT();
 }
