@@ -12,7 +12,7 @@ struct Server {
     int numStations;
 };
 
-bool initServer(struct Server* server, int numStations, int chargersPerStation);
+bool initServer(struct Server* server, int numStations, int chargersPerStation, key_t firstQueueKey);
 void shutdownServer(struct Server* server);
 
 // Traite une requête reçue ; renvoie false lorsque le serveur doit s'arrêter

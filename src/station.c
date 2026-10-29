@@ -24,7 +24,7 @@ static void semAdd(int semId, unsigned short semNum, short delta) {
     }
 }
 
-bool initStation(struct Station* station, int id, int numChargers) {
+bool initStation(struct Station* station, int id, int numChargers, key_t mqKey) {
     station->id = id;
     station->numChargers = numChargers;
     station->chargers = malloc(numChargers * sizeof(struct Charger));
@@ -37,16 +37,18 @@ bool initStation(struct Station* station, int id, int numChargers) {
         station->chargers[i].id = i;
         station->chargers[i].maxPower = 50; // Exemple : 50 kW
         station->chargers[i].status = AVAILABLE;
-        station->chargers[i].session = (struct ChargingSession){ .vehicleId = NO_VEHICLE };
     }
 
-    initWaitQueue(&station->waitQueue);
+    station->waitQueue = initMessageQueue(mqKey);
+    if (station->waitQueue == -1) {
+        goto free_chargers;
+    }
 
     // Sémaphores propres au serveur : verrou libre, toutes les bornes disponibles
     station->semId = semget(IPC_PRIVATE, SEM_COUNT, 0600 | IPC_CREAT);
     if (station->semId == -1) {
         perror("Erreur semget");
-        goto free_chargers;
+        goto destroy_queue;
     }
 
     unsigned short initialValues[SEM_COUNT] = {
@@ -57,11 +59,13 @@ bool initStation(struct Station* station, int id, int numChargers) {
     if (semctl(station->semId, 0, SETALL, arg) == -1) {
         perror("Erreur semctl(SETALL)");
         semctl(station->semId, 0, IPC_RMID);
-        goto free_chargers;
+        goto destroy_queue;
     }
 
     return true;
 
+destroy_queue:
+    destroyMessageQueue(station->waitQueue);
 free_chargers:
     free(station->chargers);
     station->chargers = NULL;
@@ -72,6 +76,7 @@ void destroyStation(struct Station* station) {
     if (semctl(station->semId, 0, IPC_RMID) == -1) {
         perror("Erreur semctl(IPC_RMID)");
     }
+    destroyMessageQueue(station->waitQueue);
     free(station->chargers);
     station->chargers = NULL;
     station->numChargers = 0;
