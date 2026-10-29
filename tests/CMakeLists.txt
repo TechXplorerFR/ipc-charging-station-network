@@ -17,5 +17,6 @@ endfunction()
 
 ipc_add_test(test_message_queue test_message_queue.c message_queue.c)
 ipc_add_test(test_queue_manager test_queue_manager.c queue_manager.c)
+ipc_add_test(test_charger test_charger.c charger.c)
 ipc_add_test(test_station test_station.c station.c charger.c queue_manager.c)
 ipc_add_test(test_allocator test_allocator.c allocator.c station.c charger.c queue_manager.c)

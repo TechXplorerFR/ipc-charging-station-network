@@ -65,7 +65,9 @@ static void testSessionRecordsTheRequest(void) {
     const struct ChargingSession* session = &station.chargers[1].session;
     CHECK(session->vehicleId == 7);
     CHECK(session->desiredPower == 40);
+    CHECK(session->power == 40);
     CHECK(session->isPrioritary);
+    CHECK(!session->ended);
     CHECK(session->start.tv_sec > before.tv_sec
           || (session->start.tv_sec == before.tv_sec && session->start.tv_nsec >= before.tv_nsec));
 
@@ -111,6 +113,8 @@ static void testReleasedChargerGoesToNextInQueue(void) {
     struct WaitingVehicle next;
     CHECK(releaseChargerAndServeQueue(&station, 1, &finished, &next) == HANDOVER_REASSIGNED);
     CHECK(finished.vehicleId == 0);
+    CHECK(finished.ended);
+    CHECK(!station.chargers[1].session.ended);
     CHECK(next.vehicleId == 11);
     CHECK(station.chargers[1].status == OCCUPIED);
     CHECK(sessionVehicle(&station, 1) == 11);
@@ -147,6 +151,7 @@ static void testFaultAndRepair(void) {
     CHECK(takeChargerOutOfService(&station, 2, OUT_OF_SERVICE, &interrupted));
     CHECK(interrupted.vehicleId == 1);
     CHECK(interrupted.desiredPower == 50);
+    CHECK(interrupted.ended);
     CHECK(station.chargers[2].status == OUT_OF_SERVICE);
     CHECK(sessionVehicle(&station, 2) == NO_VEHICLE);
 

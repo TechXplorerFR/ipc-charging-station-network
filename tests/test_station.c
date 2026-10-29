@@ -132,8 +132,7 @@ static void testPrintStation(void) {
     }
     lockStation(&station);
     setStationChargerStatus(&station, 1, OCCUPIED);
-    station.chargers[1].session.vehicleId = 42;
-    clock_gettime(CLOCK_MONOTONIC, &station.chargers[1].session.start);
+    startChargingSession(&station.chargers[1], 42, 30, false);
     setStationChargerStatus(&station, 2, OUT_OF_SERVICE);
     unlockStation(&station);
 

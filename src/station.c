@@ -78,8 +78,8 @@ bool initStationWithPowers(struct Station* station, int id, const int* chargerPo
             .id = i,
             .maxPower = chargerPowers[i],
             .status = AVAILABLE,
-            .session = { .vehicleId = NO_VEHICLE },
         };
+        clearChargingSession(&station->chargers[i]);
     }
 
     initWaitQueue(&station->waitQueue);
@@ -222,7 +222,9 @@ void printStation(struct Station* station) {
         const struct Charger* charger = &station->chargers[i];
         printf("  Borne %d (%d kW) : %s", charger->id, charger->maxPower, chargerStatusName(charger->status));
         if (charger->status == OCCUPIED) {
-            printf(", véhicule %d depuis %.1f s", charger->session.vehicleId, secondsSince(&charger->session.start));
+            const struct ChargingSession* session = &charger->session;
+            printf(", véhicule %d à %d kW depuis %.1f s (%.1f kWh)", session->vehicleId, session->power,
+                   sessionDurationSeconds(session), sessionEnergyKWh(session));
         }
         printf("\n");
     }
