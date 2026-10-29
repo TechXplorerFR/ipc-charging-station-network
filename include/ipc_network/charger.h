@@ -27,10 +27,17 @@ struct Charger {
     int maxPower; // kW
     ChargerStatus status;
     struct ChargingSession session; // Significative seulement si status == OCCUPIED
+
+    // Tenus à jour par setStationChargerStatus() pour le taux d'occupation
+    double occupiedSeconds;        // Temps passé à l'état OCCUPIED, recharge en cours non comprise
+    struct timespec occupiedSince; // Passage à l'état OCCUPIED (horloge CLOCK_MONOTONIC), si OCCUPIED
 };
 
 // Modifie l'état brut de la borne, sans toucher aux sémaphores de la station :
 // depuis l'extérieur de station.c, passer par setStationChargerStatus()
 void setChargerStatus(struct Charger* charger, ChargerStatus newStatus);
+
+// Libellé de l'état, pour l'affichage
+const char* chargerStatusName(ChargerStatus status);
 
 #endif // CHARGER_H
