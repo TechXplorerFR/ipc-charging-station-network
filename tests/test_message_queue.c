@@ -12,8 +12,9 @@ static void testVehicleTypesNeverReachServer(void) {
 }
 
 static void testServerMessageRoundTrip(void) {
+    // mtype volontairement faux : sendToServer doit le corriger
     Message sent = {
-        .mtype = SERVER_MSG_TYPE,
+        .mtype = 42,
         .request = REQ_CHARGE_DEMAND,
         .vehicle_id = 12,
         .station_id = 2,
@@ -22,10 +23,11 @@ static void testServerMessageRoundTrip(void) {
         .estimated_duration = 30,
         .is_prioritary = true,
     };
-    CHECK(sendMessage(queue, &sent));
+    CHECK(sendToServer(queue, &sent));
 
     Message received;
-    CHECK(receiveMessage(queue, &received, SERVER_MSG_TYPE));
+    CHECK(receiveMessage(queue, &received, SERVER_MSG_TYPE) == MSG_RECEIVED);
+    CHECK(received.mtype == SERVER_MSG_TYPE);
     CHECK(received.request == REQ_CHARGE_DEMAND);
     CHECK(received.vehicle_id == 12);
     CHECK(received.station_id == 2);
@@ -52,23 +54,94 @@ static void testResponsesReachOnlyTheirVehicle(void) {
     CHECK(tryReceiveMessage(queue, &received, vehicleMsgType(7)) == MSG_NONE);
 }
 
-static void* vehicleThread(void* arg) {
-    Message* received = arg;
-    receiveMessage(queue, received, vehicleMsgType(4));
+struct VehicleListener {
+    msgq_t queue;
+    int vehicleId;
+    int messagesBeforeShutdown; // Messages reçus avant NOTIF_SHUTDOWN
+    ReceiveStatus lastStatus;
+};
+
+// Boucle type d'un thread véhicule : traite ses messages jusqu'à l'arrêt ou la fermeture de la file
+static void* vehicleListener(void* arg) {
+    struct VehicleListener* listener = arg;
+    Message msg;
+    while ((listener->lastStatus = receiveMessage(listener->queue, &msg, vehicleMsgType(listener->vehicleId)))
+           == MSG_RECEIVED) {
+        if (msg.request == NOTIF_SHUTDOWN) {
+            break;
+        }
+        listener->messagesBeforeShutdown++;
+    }
     return NULL;
 }
 
-static void testThreadWaitsForItsResponse(void) {
-    Message received = { .request = REQ_SHUTDOWN };
+static void testShutdownNotificationStopsVehicle(void) {
+    struct VehicleListener listener = { .queue = queue, .vehicleId = 4 };
     pthread_t thread;
-    CHECK(pthread_create(&thread, NULL, vehicleThread, &received) == 0);
+    CHECK(pthread_create(&thread, NULL, vehicleListener, &listener) == 0);
 
-    Message response = { .request = RESP_QUEUED, .queue_position = 2 };
-    CHECK(sendToVehicle(queue, 4, &response));
+    Message queued = { .request = RESP_QUEUED, .station_id = 0, .queue_position = 2 };
+    Message shutdown = { .request = NOTIF_SHUTDOWN };
+    CHECK(sendToVehicle(queue, 4, &queued));
+    CHECK(sendToVehicle(queue, 4, &shutdown));
     pthread_join(thread, NULL);
 
-    CHECK(received.request == RESP_QUEUED);
-    CHECK(received.queue_position == 2);
+    CHECK(listener.lastStatus == MSG_RECEIVED);
+    CHECK(listener.messagesBeforeShutdown == 1);
+}
+
+static void testDestroyedQueueWakesBlockedVehicle(void) {
+    struct VehicleListener listener = { .queue = initMessageQueue(IPC_PRIVATE), .vehicleId = 5 };
+    pthread_t thread;
+    CHECK(pthread_create(&thread, NULL, vehicleListener, &listener) == 0);
+
+    destroyMessageQueue(listener.queue);
+    pthread_join(thread, NULL);
+
+    CHECK(listener.lastStatus == MSG_CLOSED);
+    Message msg;
+    CHECK(tryReceiveMessage(listener.queue, &msg, vehicleMsgType(5)) == MSG_CLOSED);
+}
+
+// Utilise la vraie clé du serveur : ne pas lancer pendant une simulation
+static void testCreateServerQueuePurgesStaleMessages(void) {
+    msgq_t stale = openServerQueue();
+    Message leftover = { .request = REQ_CHARGE_DEMAND, .vehicle_id = 1, .station_id = 0, .desired_power = 50 };
+    CHECK(sendToServer(stale, &leftover));
+
+    msgq_t fresh = createServerQueue();
+    CHECK(fresh != -1);
+    Message msg;
+    CHECK(tryReceiveMessage(fresh, &msg, SERVER_MSG_TYPE) == MSG_NONE);
+    CHECK(openServerQueue() == fresh);
+
+    destroyMessageQueue(fresh);
+}
+
+static void testWellFormedMessages(void) {
+    Message demand = { .request = REQ_CHARGE_DEMAND, .vehicle_id = 1, .station_id = 0, .desired_power = 50 };
+    CHECK(isWellFormedMessage(&demand));
+    demand.desired_power = 0;
+    CHECK(!isWellFormedMessage(&demand));
+
+    Message end = { .request = REQ_CHARGE_END, .vehicle_id = 1, .station_id = 0, .charger_id = -1 };
+    CHECK(!isWellFormedMessage(&end));
+    end.charger_id = 2;
+    CHECK(isWellFormedMessage(&end));
+
+    Message alert = { .request = REQ_ALERT, .vehicle_id = -1, .station_id = 1, .charger_id = 0 };
+    CHECK(isWellFormedMessage(&alert));
+
+    Message pong = { .request = REQ_PONG, .vehicle_id = 3, .battery_level = 101 };
+    CHECK(!isWellFormedMessage(&pong));
+    pong.battery_level = 80;
+    CHECK(isWellFormedMessage(&pong));
+
+    Message queued = { .request = RESP_QUEUED, .vehicle_id = 3, .station_id = 0, .queue_position = 0 };
+    CHECK(!isWellFormedMessage(&queued));
+
+    Message unknown = { .request = (RequestType)99 };
+    CHECK(!isWellFormedMessage(&unknown));
 }
 
 int main(void) {
@@ -80,7 +153,10 @@ int main(void) {
     RUN_TEST(testVehicleTypesNeverReachServer);
     RUN_TEST(testServerMessageRoundTrip);
     RUN_TEST(testResponsesReachOnlyTheirVehicle);
-    RUN_TEST(testThreadWaitsForItsResponse);
+    RUN_TEST(testShutdownNotificationStopsVehicle);
+    RUN_TEST(testDestroyedQueueWakesBlockedVehicle);
+    RUN_TEST(testCreateServerQueuePurgesStaleMessages);
+    RUN_TEST(testWellFormedMessages);
 
     destroyMessageQueue(queue);
     return TEST_RESULT();
