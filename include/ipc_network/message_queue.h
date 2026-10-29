@@ -24,6 +24,7 @@ typedef enum {
     REQ_SHUTDOWN,
     REQ_CANCEL, // Le véhicule quitte la file d'attente
     REQ_PONG,   // Réponse à NOTIF_PING, avec le niveau de batterie
+    REQ_REPAIR, // Fin de réparation d'une borne (station_id, charger_id)
 
     // Serveur -> véhicule
     RESP_ASSIGNED,  // Borne attribuée (station_id, charger_id, desired_power = puissance délivrée)
