@@ -41,11 +41,14 @@ echo [INFO] Distribution WSL utilisee : %DISTRO%
 echo.
 
 @REM 3. Compilation et lancement via le script Linux
-@REM    tr supprime les fins de ligne Windows (CRLF) eventuellement ajoutees par Git.
-@REM    IPC_PROJECT_DIR indique au script la racine du projet (vue depuis WSL).
+@REM    IPC_PROJECT_DIR indique au script la racine du projet. WSLENV (option /p) la transmet a WSL
+@REM    en convertissant le chemin Windows en chemin Linux : les espaces du chemin sont conserves,
+@REM    sans passer par une ligne de commande bash qui les decouperait.
+@REM    tr supprime les fins de ligne Windows (CRLF) d'une copie de travail anterieure a .gitattributes.
 @REM    Le nom de distribution ne doit pas etre entre guillemets (wsl -d les refuse).
-SET PROJECT_DIR=%~dp0..
-wsl -d %DISTRO% --cd "%PROJECT_DIR%" -- bash -c "export IPC_PROJECT_DIR=$PWD; bash <(tr -d '\r' < launch/run_linux.sh) %*"
+FOR %%I IN ("%~dp0..") DO SET "IPC_PROJECT_DIR=%%~fI"
+SET "WSLENV=IPC_PROJECT_DIR/p:%WSLENV%"
+wsl -d %DISTRO% --cd "%IPC_PROJECT_DIR%" -- bash -c "bash <(tr -d '\r' < launch/run_linux.sh) %*"
 SET RESULT=%ERRORLEVEL%
 
 echo.
