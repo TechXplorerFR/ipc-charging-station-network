@@ -1,0 +1,5 @@
+# Fins de ligne imposées quel que soit core.autocrlf :
+# bash refuse les scripts en CRLF (« /bin/bash^M: bad interpreter »),
+# cmd.exe peut mal interpréter les scripts en LF
+*.sh  text eol=lf
+*.cmd text eol=crlf
