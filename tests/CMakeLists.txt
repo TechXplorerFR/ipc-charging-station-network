@@ -25,3 +25,6 @@ ipc_add_test(test_billing test_billing.c billing.c charger.c)
 ipc_add_test(test_history test_history.c history.c)
 ipc_add_test(test_server test_server.c server.c allocator.c station.c charger.c queue_manager.c message_queue.c
              vehicle.c billing.c history.c)
+ipc_add_test(test_vehicle_generator test_vehicle_generator.c vehicle_generator.c server.c allocator.c station.c
+             charger.c queue_manager.c message_queue.c vehicle.c billing.c history.c)
+target_link_libraries(test_vehicle_generator PRIVATE m)
