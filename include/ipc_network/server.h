@@ -3,10 +3,15 @@
 
 #include <stdbool.h>
 #include <time.h>
+#include "billing.h"
+#include "history.h"
 #include "message_queue.h"
 #include "station.h"
 
 #define MAX_STATIONS 30
+
+// Nombre de sessions de l'historique reprises dans le rapport de fin
+#define REPORT_HISTORY_RECORDS 10
 
 // Intervalle entre deux passes de maintenance (expiration des attentes trop longues, ping)
 #define SERVER_MAINTENANCE_PERIOD_SECONDS 1.0
@@ -33,14 +38,17 @@ struct Server {
     int numStations;
     msgq_t queue; // File des requêtes et des réponses aux véhicules, -1 si fermée
     struct ServerStats stats;
+    struct Tariff tariff;     // Appliqué à chaque session terminée ou interrompue
+    struct History history;   // Sessions facturées
     struct timespec lastMaintenance; // Horloge CLOCK_MONOTONIC
     struct timespec lastPing;
 };
 
-// Crée les stations et la file du serveur (en purgeant celle d'une exécution précédente)
+// Crée les stations, l'historique et la file du serveur (en purgeant celle d'une exécution précédente).
+// Le tarif vaut DEFAULT_TARIFF ; il peut être changé avant de lancer runServer().
 bool initServer(struct Server* server, int numStations, int chargersPerStation);
-// Supprime la file (les véhicules qui l'attendent encore reçoivent MSG_CLOSED) et libère les stations ;
-// sans effet si c'est déjà fait
+// Supprime la file (les véhicules qui l'attendent encore reçoivent MSG_CLOSED), libère les stations
+// et l'historique ; sans effet si c'est déjà fait
 void shutdownServer(struct Server* server);
 
 // Vérifie puis traite une requête et envoie les réponses aux véhicules concernés.
@@ -54,7 +62,8 @@ void runServerMaintenance(struct Server* server);
 // Boucle principale : traite les requêtes et la maintenance jusqu'à REQ_SHUTDOWN ou la suppression de la file
 void runServer(struct Server* server);
 
-// Rapport de fin de simulation : état des stations, recharges, énergie, temps d'attente, pannes
+// Rapport de fin de simulation : état des stations, recharges, énergie, chiffre d'affaires, temps d'attente,
+// pannes et dernières sessions de l'historique
 void printServerReport(struct Server* server);
 
 #endif // SERVER_H

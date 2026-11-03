@@ -128,10 +128,29 @@ static void sendAssignment(struct Server* server, int vehicleId, const struct St
     }
 }
 
-// Session terminée ou interrompue : comptabilise l'énergie délivrée
-static void recordSession(struct Server* server, const struct ChargingSession* session) {
-    server->stats.deliveredEnergyKWh += sessionEnergyKWh(session);
-    // TODO Facturer la session et l'enregistrer dans l'historique (modules billing et history)
+// Session terminée ou interrompue : la facture (remise fidélité selon l'historique) et l'enregistre
+static void recordSession(struct Server* server, int stationId, int chargerId, const struct ChargingSession* session,
+                          bool interrupted) {
+    int recentSessions =
+        countRecentSessions(&server->history, session->vehicleId, server->tariff.loyaltyWindowSeconds);
+    struct Invoice invoice = computeInvoice(&server->tariff, session, interrupted, recentSessions);
+    printInvoice(&invoice);
+    server->stats.deliveredEnergyKWh += invoice.energyKWh;
+
+    struct SessionRecord record = {
+        .vehicleId = session->vehicleId,
+        .stationId = stationId,
+        .chargerId = chargerId,
+        .power = session->power,
+        .energyKWh = invoice.energyKWh,
+        .durationSeconds = invoice.durationSeconds,
+        .cost = invoice.total,
+        .interrupted = interrupted,
+        .isPrioritary = session->isPrioritary,
+    };
+    if (!addSessionRecord(&server->history, &record)) {
+        fprintf(stderr, "[SERVEUR] Erreur : session du véhicule %d absente de l'historique.\n", session->vehicleId);
+    }
 }
 
 // Redirige un véhicule dont la recharge a été interrompue : borne libre ou tête de file sur sa station,
@@ -196,10 +215,10 @@ static void handleChargeEnd(struct Server* server, const Message* msg) {
     }
 
     server->stats.completedCharges++;
-    recordSession(server, &finished);
     printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d (%.1f kWh en %.1f s).\n",
            finished.vehicleId, msg->charger_id, station->id, sessionEnergyKWh(&finished),
            sessionDurationSeconds(&finished));
+    recordSession(server, station->id, msg->charger_id, &finished, false);
 
     if (result == HANDOVER_REASSIGNED) {
         sendAssigned(server, next.vehicleId, station, msg->charger_id, next.desiredPower);
@@ -236,9 +255,9 @@ static void handleAlert(struct Server* server, const Message* msg) {
     }
 
     server->stats.interruptedCharges++;
-    recordSession(server, &interrupted);
     printf("[SERVEUR] Véhicule %d : recharge interrompue après %.1f kWh.\n", interrupted.vehicleId,
            sessionEnergyKWh(&interrupted));
+    recordSession(server, station->id, msg->charger_id, &interrupted, true);
     notifyVehicle(server, interrupted.vehicleId, NOTIF_FAULT, station->id, msg->charger_id);
     redirectVehicle(server, station, &interrupted);
 }
@@ -273,8 +292,13 @@ bool initServer(struct Server* server, int numStations, int chargersPerStation) 
     server->numStations = 0;
     server->queue = -1;
     server->stats = (struct ServerStats){ 0 };
+    server->tariff = DEFAULT_TARIFF;
+    if (!initHistory(&server->history)) {
+        return false;
+    }
     if (numStations <= 0 || numStations > MAX_STATIONS) {
         printf("[SERVEUR] Erreur : %d stations demandées (1 à %d).\n", numStations, MAX_STATIONS);
+        destroyHistory(&server->history);
         return false;
     }
 
@@ -306,6 +330,7 @@ void shutdownServer(struct Server* server) {
         destroyStation(&server->stations[i]);
     }
     server->numStations = 0;
+    destroyHistory(&server->history);
 }
 
 bool handleRequest(struct Server* server, const Message* msg) {
@@ -411,6 +436,8 @@ void printServerReport(struct Server* server) {
     for (int s = 0; s < server->numStations; s++) {
         struct Station* station = &server->stations[s];
         printStation(station);
+        struct HistorySummary stationSummary = summarizeHistory(&server->history, s);
+        printf("  Chiffre d'affaires : %.2f € sur %d session(s)\n", stationSummary.revenue, stationSummary.sessions);
 
         lockStation(station);
         servedFromQueue += station->waitQueue.stats.served;
@@ -424,11 +451,14 @@ void printServerReport(struct Server* server) {
     printf("Recharges terminées : %d, interrompues par une panne : %d\n", stats->completedCharges,
            stats->interruptedCharges);
     printf("Énergie délivrée : %.1f kWh\n", stats->deliveredEnergyKWh);
+    struct HistorySummary networkSummary = summarizeHistory(&server->history, ALL_STATIONS);
+    printf("Chiffre d'affaires : %.2f € (%.2f € par session en moyenne)\n", networkSummary.revenue,
+           networkSummary.sessions > 0 ? networkSummary.revenue / networkSummary.sessions : 0.0);
     printf("Temps d'attente moyen : %.1f s sur %d véhicule(s) servi(s)\n",
            servedVehicles > 0 ? totalWaitSeconds / servedVehicles : 0.0, servedVehicles);
     printf("Pannes : %d, réparations : %d, redirections vers une autre station : %d\n", stats->faults,
            stats->repairs, stats->redirections);
     printf("Refus : %d, requêtes reçues : %d (dont %d incohérentes)\n", stats->refused, stats->requests,
            stats->malformed);
-    // TODO Chiffre d'affaires (module billing)
+    printHistory(&server->history, REPORT_HISTORY_RECORDS);
 }

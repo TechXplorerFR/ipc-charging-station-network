@@ -120,6 +120,13 @@ static void testFaultNotifiesThenRepairServesQueue(void) {
     CHECK(server.stats.faults == 1);
     CHECK(server.stats.interruptedCharges == 1);
 
+    // Session interrompue facturée sans frais fixes
+    struct SessionRecord record;
+    CHECK(getSessionRecord(&server.history, 0, &record));
+    CHECK(record.interrupted);
+    CHECK(record.vehicleId == 1 && record.stationId == 0 && record.chargerId == 0);
+    CHECK(record.cost < server.tariff.sessionFee);
+
     CHECK(handle(REQ_REPAIR, -1, 0, 0, 0));
     Message assigned = responseFor(1);
     CHECK(assigned.request == RESP_ASSIGNED);
@@ -129,6 +136,26 @@ static void testFaultNotifiesThenRepairServesQueue(void) {
     // Une borne en service ne se répare pas
     CHECK(handle(REQ_REPAIR, -1, 0, 0, 0));
     CHECK(server.stats.repairs == 1);
+
+    shutdownServer(&server);
+}
+
+static void testLoyalVehicleGetsDiscount(void) {
+    if (!setUp(1, 1)) {
+        return;
+    }
+    // Trois recharges de suite du même véhicule : la troisième bénéficie de la remise fidélité
+    for (int i = 0; i < 3; i++) {
+        demand(1, 0, 50);
+        CHECK(responseFor(1).request == RESP_ASSIGNED);
+        CHECK(handle(REQ_CHARGE_END, 1, 0, 0, 0));
+    }
+
+    struct SessionRecord first, third;
+    CHECK(getSessionRecord(&server.history, 0, &first));
+    CHECK(getSessionRecord(&server.history, 2, &third));
+    CHECK(first.cost >= server.tariff.sessionFee);
+    CHECK(third.cost < server.tariff.sessionFee * (1.0 - server.tariff.loyaltyDiscountRate) + 0.01);
 
     shutdownServer(&server);
 }
@@ -272,6 +299,12 @@ static void testEndToEndWithVehicleThreads(void) {
     CHECK(server.stats.malformed == 0);
     // 4 × 0,5 kWh, à quelques millisecondes de latence près
     CHECK(server.stats.deliveredEnergyKWh > 1.9 && server.stats.deliveredEnergyKWh < 2.5);
+
+    // 4 sessions : 4 × 1 € de frais + environ 2 kWh à 0,35 €
+    struct HistorySummary summary = summarizeHistory(&server.history, ALL_STATIONS);
+    CHECK(summary.sessions == END_TO_END_VEHICLES);
+    CHECK(summary.interruptedSessions == 0);
+    CHECK(summary.revenue > 4.6 && summary.revenue < 4.9);
     printServerReport(&server);
 
     shutdownServer(&server);
@@ -281,6 +314,7 @@ int main(void) {
     RUN_TEST(testDemandsGetAssignedQueuedOrRefused);
     RUN_TEST(testChargeEndServesNextInQueue);
     RUN_TEST(testFaultNotifiesThenRepairServesQueue);
+    RUN_TEST(testLoyalVehicleGetsDiscount);
     RUN_TEST(testFaultRedirectsToAnotherStationWhenQueueIsFull);
     RUN_TEST(testInvalidRequestsAreIgnored);
     RUN_TEST(testCancelAndPong);

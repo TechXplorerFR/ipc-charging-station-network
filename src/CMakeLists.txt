@@ -1,7 +1,9 @@
 # Modules du réseau de stations (tout sauf le point d'entrée)
 set(IPC_MODULE_SOURCES
     allocator.c
+    billing.c
     charger.c
+    history.c
     message_queue.c
     queue_manager.c
     server.c
