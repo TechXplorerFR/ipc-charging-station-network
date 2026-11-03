@@ -109,7 +109,8 @@ bool isWellFormedMessage(const Message* msg) {
         case REQ_CHARGE_END:
             return msg->vehicle_id >= 0 && msg->station_id >= 0 && msg->charger_id >= 0;
 
-        case REQ_ALERT: // Envoyée par le simulateur de pannes ou la CLI : pas de véhicule
+        case REQ_ALERT: // Envoyées par le simulateur de pannes ou la CLI : pas de véhicule
+        case REQ_REPAIR:
             return msg->station_id >= 0 && msg->charger_id >= 0;
 
         case REQ_CANCEL:
