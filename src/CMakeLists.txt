@@ -5,6 +5,11 @@ set(IPC_MODULE_SOURCES
     message_queue.c
     queue_manager.c
     server.c
+    scenarios.c
+    scenarios/scenario_affluence.c
+    scenarios/scenario_panne.c
+    scenarios/scenario_petit.c
+    scenarios/scenario_standard.c
     station.c
     vehicle.c
 )

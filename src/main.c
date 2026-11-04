@@ -1,50 +1,110 @@
+#include "scenario.h"
 #include "server.h"
-#include "vehicle.h"
 #include <pthread.h>
-#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#define DEMO_STATIONS 2
-#define DEMO_CHARGERS_PER_STATION 2
-#define DEMO_VEHICLES 8
+static int waitForVehicleCharger(struct Server* server, int stationId, int vehicleId) {
+    const struct timespec retry = { .tv_sec = 0, .tv_nsec = 10000000L };
+    struct Station* station = &server->stations[stationId];
 
-struct DemoVehicle {
-    VehicleType type;
-    double capacity;
-    double initialCharge;
-    int maxPower;
-    const char* destination;
-    bool isPrioritary;
-    int stationId;
-};
-
-static const struct DemoVehicle demoVehicles[DEMO_VEHICLES] = {
-    { CAR, 50.0, 49.0, 50, "Belfort", false, 0 },
-    { VAN, 80.0, 79.0, 50, "Montbeliard", false, 0 },
-    { BUS, 200.0, 199.0, 150, "Belfort", false, 0 },
-    { CAR, 50.0, 49.0, 50, "Montbeliard", true, 0 },
-    { CAR, 50.0, 49.0, 50, "Belfort", false, 1 },
-    { VAN, 80.0, 79.0, 50, "Montbeliard", false, 1 },
-    { BUS, 200.0, 199.0, 150, "Belfort", false, 1 },
-    { CAR, 50.0, 49.0, 50, "Montbeliard", true, 1 },
-};
-
-static void destroyVehicles(struct Vehicle* vehicles[DEMO_VEHICLES]) {
-    for (int i = 0; i < DEMO_VEHICLES; i++) {
-        destroyVehicle(vehicles[i]);
+    for (int attempt = 0; attempt < 500; attempt++) {
+        int chargerId = -1;
+        lockStation(station);
+        for (int i = 0; i < station->numChargers; i++) {
+            const struct Charger* charger = &station->chargers[i];
+            if (charger->status == OCCUPIED && charger->session.vehicleId == vehicleId) {
+                chargerId = i;
+                break;
+            }
+        }
+        unlockStation(station);
+        if (chargerId != -1) {
+            return chargerId;
+        }
+        nanosleep(&retry, NULL);
     }
+
+    return -1;
 }
 
-static bool requestServerShutdown(struct Server* server) {
-    Message shutdown = { .request = REQ_SHUTDOWN };
-    if (sendToServer(server->queue, &shutdown)) {
-        return true;
+static bool demonstrateQueueCancellation(struct Server* server, int stationId, int vehicleId) {
+    Message demand = {
+        .request = REQ_CHARGE_DEMAND,
+        .vehicle_id = vehicleId,
+        .station_id = stationId,
+        .charger_id = -1,
+        .desired_power = 50,
+        .estimated_duration = 1,
+    };
+    if (!sendToServer(server->queue, &demand)) {
+        fprintf(stderr, "[SIMULATION] Impossible d'envoyer la demande d'annulation.\n");
+        return false;
     }
 
-    fprintf(stderr, "[SIMULATION] Impossible d'envoyer la demande d'arret du serveur.\n");
-    destroyMessageQueue(server->queue);
-    server->queue = -1;
+    Message response;
+    if (receiveMessage(server->queue, &response, vehicleMsgType(vehicleId)) != MSG_RECEIVED
+        || response.request != RESP_QUEUED) {
+        fprintf(stderr, "[SIMULATION] Le véhicule temporaire n'a pas été mis en attente.\n");
+        return false;
+    }
+
+    Message cancel = {
+        .request = REQ_CANCEL,
+        .vehicle_id = vehicleId,
+        .station_id = stationId,
+    };
+    if (!sendToServer(server->queue, &cancel)) {
+        fprintf(stderr, "[SIMULATION] Impossible d'annuler la demande en attente.\n");
+        return false;
+    }
+    printf("[SIMULATION] Le véhicule temporaire %d a annulé sa demande en attente.\n", vehicleId);
+    return true;
+}
+
+static bool demonstrateFaultAndRepair(struct Server* server, int stationId, int vehicleId) {
+    int chargerId = waitForVehicleCharger(server, stationId, vehicleId);
+    if (chargerId == -1) {
+        fprintf(stderr, "[SIMULATION] Le véhicule %d n'a pas obtenu de borne à temps pour la panne.\n", vehicleId);
+        return false;
+    }
+
+    Message fault = {
+        .request = REQ_ALERT,
+        .vehicle_id = -1,
+        .station_id = stationId,
+        .charger_id = chargerId,
+    };
+    if (!sendToServer(server->queue, &fault)) {
+        fprintf(stderr, "[SIMULATION] Impossible de signaler la panne de la borne %d.\n", chargerId);
+        return false;
+    }
+
+    Message repair = {
+        .request = REQ_REPAIR,
+        .vehicle_id = -1,
+        .station_id = stationId,
+        .charger_id = chargerId,
+    };
+    if (!sendToServer(server->queue, &repair)) {
+        fprintf(stderr, "[SIMULATION] Impossible de demander la réparation de la borne %d.\n", chargerId);
+        return false;
+    }
+    return true;
+}
+
+static bool runScenarioEvent(struct Server* server, const struct Scenario* scenario,
+                             const struct ScenarioEvent* event, int eventIndex) {
+    switch (event->type) {
+        case SCENARIO_CANCEL_WAITING:
+            return demonstrateQueueCancellation(server, event->stationId,
+                                                scenario->numVehicles + eventIndex);
+        case SCENARIO_FAULT_AND_REPAIR:
+            return demonstrateFaultAndRepair(server, event->stationId, event->vehicleId);
+    }
+    fprintf(stderr, "[SIMULATION] Type d'événement inconnu dans le scénario.\n");
     return false;
 }
 
@@ -53,24 +113,59 @@ static void* runServerThread(void* arg) {
     return NULL;
 }
 
-int main(void) {
+static bool requestServerShutdown(struct Server* server) {
+    Message shutdown = { .request = REQ_SHUTDOWN };
+    if (sendToServer(server->queue, &shutdown)) {
+        return true;
+    }
+
+    fprintf(stderr, "[SIMULATION] Impossible d'envoyer la demande d'arrêt du serveur.\n");
+    destroyMessageQueue(server->queue);
+    server->queue = -1;
+    return false;
+}
+
+static int runScenario(const struct Scenario* scenario) {
     struct Server server;
-    struct Vehicle* vehicles[DEMO_VEHICLES] = { 0 };
-    struct VehicleTrip trips[DEMO_VEHICLES] = { 0 };
+    struct Vehicle* vehicles[MAX_SCENARIO_VEHICLES] = { 0 };
+    struct VehicleTrip trips[MAX_SCENARIO_VEHICLES] = { 0 };
     pthread_t serverTid;
-    pthread_t vehicleThreads[DEMO_VEHICLES];
+    pthread_t vehicleThreads[MAX_SCENARIO_VEHICLES];
     int startedVehicles = 0;
     bool serverStarted = false;
     bool simulationSucceeded = true;
 
-    printf("=== Simulation du reseau de bornes de recharge ===\n");
-    if (!initServer(&server, DEMO_STATIONS, DEMO_CHARGERS_PER_STATION)) {
+    if (scenario->numStations <= 0 || scenario->numStations > MAX_STATIONS
+        || scenario->chargersPerStation <= 0 || scenario->chargersPerStation > MAX_CHARGERS_PER_STATION
+        || scenario->numVehicles <= 0 || scenario->numVehicles > MAX_SCENARIO_VEHICLES
+        || scenario->vehicles == NULL || scenario->numEvents < 0
+        || (scenario->numEvents > 0 && scenario->events == NULL)) {
+        fprintf(stderr, "[SIMULATION] Configuration invalide pour le scénario « %s ».\n", scenario->name);
+        return 1;
+    }
+    for (int i = 0; i < scenario->numEvents; i++) {
+        const struct ScenarioEvent* event = &scenario->events[i];
+        if (event->stationId < 0 || event->stationId >= scenario->numStations
+            || (event->type == SCENARIO_FAULT_AND_REPAIR
+                && (event->vehicleId < 0 || event->vehicleId >= scenario->numVehicles))) {
+            fprintf(stderr, "[SIMULATION] Événement invalide dans le scénario « %s ».\n", scenario->name);
+            return 1;
+        }
+    }
+
+    printf("=== Scénario : %s — %s ===\n", scenario->name, scenario->description);
+    if (!initServer(&server, scenario->numStations, scenario->chargersPerStation)) {
         fprintf(stderr, "[SIMULATION] Impossible d'initialiser le serveur.\n");
         return 1;
     }
 
-    for (int i = 0; i < DEMO_VEHICLES; i++) {
-        const struct DemoVehicle* demo = &demoVehicles[i];
+    for (int i = 0; i < scenario->numVehicles; i++) {
+        const struct ScenarioVehicle* demo = &scenario->vehicles[i];
+        if (demo->stationId < 0 || demo->stationId >= scenario->numStations) {
+            fprintf(stderr, "[SIMULATION] Station invalide pour le véhicule %d.\n", i);
+            simulationSucceeded = false;
+            goto cleanup;
+        }
         vehicles[i] = createVehicle(i, demo->type, demo->capacity, demo->initialCharge, demo->maxPower,
                                     demo->destination, demo->isPrioritary);
         if (vehicles[i] == NULL) {
@@ -86,40 +181,46 @@ int main(void) {
 
     int error = pthread_create(&serverTid, NULL, runServerThread, &server);
     if (error != 0) {
-        fprintf(stderr, "[SIMULATION] Impossible de demarrer le serveur : %s.\n", strerror(error));
+        fprintf(stderr, "[SIMULATION] Impossible de démarrer le serveur : %s.\n", strerror(error));
         simulationSucceeded = false;
         goto cleanup;
     }
     serverStarted = true;
 
-    for (int i = 0; i < DEMO_VEHICLES; i++) {
+    for (int i = 0; i < scenario->numVehicles; i++) {
         error = pthread_create(&vehicleThreads[i], NULL, vehicleThread, &trips[i]);
         if (error != 0) {
-            fprintf(stderr, "[SIMULATION] Impossible de demarrer le vehicule %d : %s.\n", i, strerror(error));
+            fprintf(stderr, "[SIMULATION] Impossible de démarrer le véhicule %d : %s.\n", i, strerror(error));
             simulationSucceeded = false;
             break;
         }
         startedVehicles++;
     }
 
-    if (startedVehicles < DEMO_VEHICLES) {
+    for (int i = 0; i < scenario->numEvents && simulationSucceeded; i++) {
+        if (!runScenarioEvent(&server, scenario, &scenario->events[i], i)) {
+            simulationSucceeded = false;
+        }
+    }
+
+    if (!simulationSucceeded || startedVehicles < scenario->numVehicles) {
         requestServerShutdown(&server);
     }
 
     for (int i = 0; i < startedVehicles; i++) {
         error = pthread_join(vehicleThreads[i], NULL);
         if (error != 0) {
-            fprintf(stderr, "[SIMULATION] Impossible de rejoindre le thread du vehicule %d : %s.\n",
+            fprintf(stderr, "[SIMULATION] Impossible de rejoindre le thread du véhicule %d : %s.\n",
                     i, strerror(error));
             simulationSucceeded = false;
         } else if (trips[i].outcome != VEHICLE_CHARGED) {
-            fprintf(stderr, "[SIMULATION] Le vehicule %d n'a pas termine sa recharge (issue %d).\n",
+            fprintf(stderr, "[SIMULATION] Le véhicule %d n'a pas terminé sa recharge (issue %d).\n",
                     i, trips[i].outcome);
             simulationSucceeded = false;
         }
     }
 
-    if (startedVehicles == DEMO_VEHICLES && !requestServerShutdown(&server)) {
+    if (simulationSucceeded && !requestServerShutdown(&server)) {
         simulationSucceeded = false;
     }
 
@@ -138,6 +239,24 @@ cleanup:
         pthread_join(serverTid, NULL);
     }
     shutdownServer(&server);
-    destroyVehicles(vehicles);
+    for (int i = 0; i < scenario->numVehicles; i++) {
+        destroyVehicle(vehicles[i]);
+    }
     return simulationSucceeded ? 0 : 1;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc > 2 || (argc == 2 && (strcmp(argv[1], "--list") == 0 || strcmp(argv[1], "-l") == 0))) {
+        printScenarios();
+        return argc > 2 ? 1 : 0;
+    }
+
+    const char* scenarioName = argc == 2 ? argv[1] : "standard";
+    const struct Scenario* scenario = findScenario(scenarioName);
+    if (scenario == NULL) {
+        fprintf(stderr, "[SIMULATION] Scénario inconnu : %s\n", scenarioName);
+        printScenarios();
+        return 1;
+    }
+    return runScenario(scenario);
 }
