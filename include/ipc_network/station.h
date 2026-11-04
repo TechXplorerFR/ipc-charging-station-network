@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include "charger.h"
-#include "message_queue.h"
+#include "queue_manager.h"
 
 // Nombre maximal de bornes par station
 #define MAX_CHARGERS_PER_STATION 32
