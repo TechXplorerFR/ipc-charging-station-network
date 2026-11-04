@@ -62,6 +62,17 @@ void runServerMaintenance(struct Server* server);
 // Boucle principale : traite les requêtes et la maintenance jusqu'à REQ_SHUTDOWN ou la suppression de la file
 void runServer(struct Server* server);
 
+// Indicateurs de performance du réseau, pour le rapport et la comparaison des scénarios
+struct ServerSummary {
+    int servedVehicles;            // Véhicules arrivés à une borne, directement ou après la file d'attente
+    double averageWaitSeconds;     // Attente réelle moyenne des véhicules servis (nulle s'ils l'ont été tout de suite)
+    double occupancyRate;          // Taux d'occupation moyen des stations depuis leur ouverture (0 à 1)
+    struct HistorySummary history; // Sessions, énergie facturée et chiffre d'affaires de tout le réseau
+};
+
+// À appeler serveur arrêté, ou depuis le thread du serveur
+struct ServerSummary summarizeServer(struct Server* server);
+
 // Rapport de fin de simulation : état des stations, recharges, énergie, chiffre d'affaires, temps d'attente,
 // pannes et dernières sessions de l'historique
 void printServerReport(struct Server* server);

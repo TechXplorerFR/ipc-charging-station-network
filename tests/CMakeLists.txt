@@ -33,3 +33,6 @@ target_link_libraries(test_random PRIVATE m)
 ipc_add_test(test_fault_simulator test_fault_simulator.c fault_simulator.c random.c server.c allocator.c
              station.c charger.c queue_manager.c message_queue.c vehicle.c billing.c history.c)
 target_link_libraries(test_fault_simulator PRIVATE m)
+# Scénarios : tous les modules sont nécessaires, la bibliothèque est utilisée telle quelle
+ipc_add_test(test_scenario test_scenario.c)
+target_link_libraries(test_scenario PRIVATE ipc_network)
