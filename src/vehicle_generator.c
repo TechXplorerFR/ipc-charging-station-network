@@ -1,4 +1,5 @@
 #include "vehicle_generator.h"
+#include "random.h"
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -40,42 +41,13 @@ const struct GeneratorConfig DEFAULT_GENERATOR_CONFIG = {
     .seed = 0,
 };
 
-// SplitMix64 : générateur propre à chaque VehicleGenerator, reproductible à graine égale
-// et sans état global partagé entre threads (contrairement à rand())
-static uint64_t nextRandom(struct VehicleGenerator* generator) {
-    uint64_t z = (generator->rngState += 0x9E3779B97F4A7C15ULL);
-    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
-    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
-    return z ^ (z >> 31);
-}
-
-// Réel uniforme dans [0, 1)
-static double randomUnit(struct VehicleGenerator* generator) {
-    return (double)(nextRandom(generator) >> 11) * 0x1.0p-53;
-}
-
-static double randomBetween(struct VehicleGenerator* generator, double min, double max) {
-    return min + (max - min) * randomUnit(generator);
-}
-
-// Entier uniforme dans [0, count)
-static int randomIndex(struct VehicleGenerator* generator, int count) {
-    return (int)(randomUnit(generator) * count);
-}
-
-static uint64_t clockSeed(void) {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
-}
-
 static const struct VehicleProfile* drawProfile(struct VehicleGenerator* generator) {
     double totalWeight = 0.0;
     for (int i = 0; i < NUM_PROFILES; i++) {
         totalWeight += PROFILES[i].weight;
     }
 
-    double draw = randomUnit(generator) * totalWeight;
+    double draw = randomUnit(&generator->rngState) * totalWeight;
     for (int i = 0; i < NUM_PROFILES - 1; i++) {
         if (draw < PROFILES[i].weight) {
             return &PROFILES[i];
@@ -102,15 +74,14 @@ bool initVehicleGenerator(struct VehicleGenerator* generator, const struct Gener
     }
 
     generator->config = *config;
-    generator->rngState = config->seed != 0 ? config->seed : clockSeed();
+    generator->rngState = config->seed != 0 ? config->seed : randomClockSeed();
     generator->nextId = firstId;
     generator->generated = 0;
     return true;
 }
 
 double nextArrivalDelaySeconds(struct VehicleGenerator* generator) {
-    // Inversion de la fonction de répartition : 1 - U est dans (0, 1], donc le logarithme est fini
-    return -log(1.0 - randomUnit(generator)) / generator->config.arrivalRate;
+    return randomExponential(&generator->rngState, generator->config.arrivalRate);
 }
 
 struct Vehicle* generateVehicle(struct VehicleGenerator* generator, int* stationId) {
@@ -120,11 +91,11 @@ struct Vehicle* generateVehicle(struct VehicleGenerator* generator, int* station
 
     const struct VehicleProfile* profile = drawProfile(generator);
     // Capacité arrondie au kWh pour des affichages lisibles
-    double capacity = round(randomBetween(generator, profile->minCapacity, profile->maxCapacity));
-    double level = randomBetween(generator, generator->config.minInitialLevel, generator->config.maxInitialLevel);
-    bool prioritary = profile->alwaysPrioritary || randomUnit(generator) < generator->config.prioritaryRate;
-    const char* destination = DESTINATIONS[randomIndex(generator, NUM_DESTINATIONS)];
-    int station = randomIndex(generator, generator->config.numStations);
+    double capacity = round(randomBetween(&generator->rngState, profile->minCapacity, profile->maxCapacity));
+    double level = randomBetween(&generator->rngState, generator->config.minInitialLevel, generator->config.maxInitialLevel);
+    bool prioritary = profile->alwaysPrioritary || randomUnit(&generator->rngState) < generator->config.prioritaryRate;
+    const char* destination = DESTINATIONS[randomIndex(&generator->rngState, NUM_DESTINATIONS)];
+    int station = randomIndex(&generator->rngState, generator->config.numStations);
 
     struct Vehicle* vehicle = createVehicle(generator->nextId, profile->type, capacity, capacity * level,
                                             profile->maxPower, destination, prioritary);
