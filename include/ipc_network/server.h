@@ -47,6 +47,7 @@ struct Server {
 // Crée les stations, l'historique et la file du serveur (en purgeant celle d'une exécution précédente).
 // Le tarif vaut DEFAULT_TARIFF ; il peut être changé avant de lancer runServer().
 bool initServer(struct Server* server, int numStations, int chargersPerStation);
+
 // Supprime la file (les véhicules qui l'attendent encore reçoivent MSG_CLOSED), libère les stations
 // et l'historique ; sans effet si c'est déjà fait
 void shutdownServer(struct Server* server);

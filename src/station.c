@@ -82,13 +82,16 @@ bool initStationWithPowers(struct Station* station, int id, const int* chargerPo
         clearChargingSession(&station->chargers[i]);
     }
 
-    initWaitQueue(&station->waitQueue);
+    station->waitQueue = initMessageQueue(mqKey);
+    if (station->waitQueue == -1) {
+        goto free_chargers;
+    }
 
     // Sémaphores propres au serveur : verrou libre, toutes les bornes disponibles
     station->semId = semget(IPC_PRIVATE, SEM_COUNT, 0600 | IPC_CREAT);
     if (station->semId == -1) {
         perror("Erreur semget");
-        goto free_chargers;
+        goto destroy_queue;
     }
 
     unsigned short initialValues[SEM_COUNT] = {
@@ -107,6 +110,8 @@ bool initStationWithPowers(struct Station* station, int id, const int* chargerPo
     clock_gettime(CLOCK_MONOTONIC, &station->openedAt);
     return true;
 
+destroy_queue:
+    destroyMessageQueue(station->waitQueue);
 free_chargers:
     free(station->chargers);
     station->chargers = NULL;

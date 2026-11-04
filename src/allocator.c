@@ -1,25 +1,20 @@
 #include "allocator.h"
+#include <stdio.h>
 
-// Une borne couvrant la demande l'emporte ; entre deux qui la couvrent, la moins puissante
-// (les bornes puissantes restent libres pour les gros besoins) ; sinon, la plus puissante
-static bool isBetterFit(int candidatePower, int currentPower, int desiredPower) {
-    bool candidateCovers = candidatePower >= desiredPower;
-    bool currentCovers = currentPower >= desiredPower;
-    if (candidateCovers != currentCovers) {
-        return candidateCovers;
+int assignChargerAtomically(struct Station* station, int vehicleId) {
+    // Aucune borne libre : inutile de prendre le verrou, le véhicule ira en file d'attente
+    if (!hasAvailableCharger(station)) {
+        return -1;
     }
-    return candidateCovers ? candidatePower < currentPower : candidatePower > currentPower;
-}
 
-// Verrou acquis : indice de la borne libre la mieux adaptée, ou -1 si aucune n'est libre
-static int findBestCharger(const struct Station* station, int desiredPower) {
-    int best = -1;
+    // Vérification, réservation et mise à jour de l'état dans la même section critique
+    lockStation(station);
+    int assignedCharger = -1;
     for (int i = 0; i < station->numChargers; i++) {
-        if (station->chargers[i].status != AVAILABLE) {
-            continue;
-        }
-        if (best == -1 || isBetterFit(station->chargers[i].maxPower, station->chargers[best].maxPower, desiredPower)) {
-            best = i;
+        if (station->chargers[i].status == AVAILABLE) {
+            setStationChargerStatus(station, i, OCCUPIED);
+            assignedCharger = i;
+            break;
         }
     }
     return best;
@@ -75,7 +70,11 @@ static struct Assignment assignOrEnqueue(struct Station* station, const struct W
     }
     unlockStation(station);
 
-    return assignment;
+    if (assignedCharger != -1) {
+        // TODO Enregistrer le début de session
+        printf("Véhicule %d assigné à la borne %d de la station %d\n", vehicleId, assignedCharger, station->id);
+    }
+    return assignedCharger;
 }
 
 struct Assignment requestCharger(struct Station* station, const struct WaitingVehicle* vehicle) {
@@ -127,29 +126,5 @@ bool takeChargerOutOfService(struct Station* station, int chargerIndex, ChargerS
     setStationChargerStatus(station, chargerIndex, status);
     clearChargingSession(charger);
     unlockStation(station);
-    return wasCharging;
-}
-
-struct Assignment redirectInterruptedVehicle(struct Station* station, const struct ChargingSession* interrupted) {
-    struct WaitingVehicle vehicle = {
-        .vehicleId = interrupted->vehicleId,
-        .desiredPower = interrupted->desiredPower,
-        .priority = interrupted->isPrioritary ? PRIORITY_HIGH : PRIORITY_NORMAL,
-    };
-    return assignOrEnqueue(station, &vehicle, true);
-}
-
-bool cancelWaitingVehicle(struct Station* station, int vehicleId) {
-    lockStation(station);
-    bool removed = removeWaitingVehicle(&station->waitQueue, vehicleId);
-    unlockStation(station);
-    return removed;
-}
-
-int expireWaitingVehicles(struct Station* station, double maxWaitSeconds, struct WaitingVehicle* expired,
-                          int capacity) {
-    lockStation(station);
-    int removed = removeExpiredVehicles(&station->waitQueue, maxWaitSeconds, expired, capacity);
-    unlockStation(station);
-    return removed;
+    return released;
 }

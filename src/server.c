@@ -241,19 +241,9 @@ static void handleChargeEnd(struct Server* server, const Message* msg) {
         sendAssigned(server, next.vehicleId, station, msg->charger_id, next.desiredPower);
     } else {
         printf("[SERVEUR] Borne %d de la station %d libérée.\n", msg->charger_id, station->id);
-    }
-}
-
-static void handleCancel(struct Server* server, const Message* msg) {
-    struct Station* station = findStation(server, msg->station_id);
-    if (station == NULL) {
-        return;
-    }
-
-    if (cancelWaitingVehicle(station, msg->vehicle_id)) {
-        printf("[SERVEUR] Véhicule %d : quitte la file d'attente de la station %d.\n", msg->vehicle_id, station->id);
+        // TODO Attribuer la borne libérée au prochain véhicule en attente
     } else {
-        printf("[SERVEUR] Erreur : le véhicule %d n'attendait pas sur la station %d.\n", msg->vehicle_id, station->id);
+        printf("[SERVEUR] Erreur : la borne %d de la station %d n'était pas occupée.\n", msg->charger_id, station->id);
     }
 }
 
@@ -305,7 +295,7 @@ static void handlePong(struct Server* server, const Message* msg) {
     printf("[SERVEUR] Véhicule %d : batterie à %d %%.\n", msg->vehicle_id, msg->battery_level);
 }
 
-bool initServer(struct Server* server, int numStations, int chargersPerStation) {
+bool initServer(struct Server* server, int numStations, int chargersPerStation, key_t firstQueueKey) {
     server->numStations = 0;
     server->queue = -1;
     server->stats = (struct ServerStats){ 0 };
@@ -320,7 +310,7 @@ bool initServer(struct Server* server, int numStations, int chargersPerStation) 
     }
 
     for (int i = 0; i < numStations; i++) {
-        if (!initStation(&server->stations[i], i, chargersPerStation)) {
+        if (!initStation(&server->stations[i], i, chargersPerStation, firstQueueKey + i)) {
             shutdownServer(server);
             return false;
         }
