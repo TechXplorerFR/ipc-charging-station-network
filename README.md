@@ -51,12 +51,16 @@ remplace pour obtenir une autre circulation.
 ```
 
 Pour comparer l'effet de la charge et des pannes sur les performances,
-`--compare` joue tous ces scénarios (sans leur journal détaillé, environ
-3 minutes) puis affiche un tableau : véhicules rechargés et refusés, pannes,
-recharges interrompues, attente moyenne, taux d'occupation, chiffre d'affaires.
+`--compare` joue tous ces scénarios l'un après l'autre (environ 3 minutes).
+Chacun s'affiche comme une exécution classique (journal, rapport du réseau,
+bilan des arrivées et des pannes), suivi de sa ligne de résultat. Un tableau
+final les compare : véhicules rechargés et refusés, pannes, recharges
+interrompues, attente moyenne, taux d'occupation, chiffre d'affaires.
+`--quiet` n'affiche que ce tableau.
 
 ```sh
 ./launch/run_linux.sh -- --compare
+./launch/run_linux.sh -- --compare --quiet
 ```
 
 ### Ajouter un scénario

@@ -78,7 +78,7 @@ bool isValidScenario(const struct Scenario* scenario);
 // (0 : celle du scénario). Renvoie result->succeeded.
 bool runScenario(const struct Scenario* scenario, uint64_t seed, bool printReport, struct ScenarioResult* result);
 
-// Tableau comparatif des résultats de plusieurs scénarios
-void printScenarioComparison(const struct ScenarioResult* results, int count);
+// Tableau des résultats de plusieurs scénarios, sous le titre donné
+void printScenarioComparison(const char* title, const struct ScenarioResult* results, int count);
 
 #endif

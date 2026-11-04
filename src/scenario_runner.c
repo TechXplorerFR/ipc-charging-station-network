@@ -437,8 +437,8 @@ bool runScenario(const struct Scenario* scenario, uint64_t seed, bool printRepor
     return succeeded;
 }
 
-void printScenarioComparison(const struct ScenarioResult* results, int count) {
-    printf("\n========== Comparaison des scénarios ==========\n");
+void printScenarioComparison(const char* title, const struct ScenarioResult* results, int count) {
+    printf("\n========== %s ==========\n", title);
     // En-tête aligné à la main : les lettres accentuées occupent deux octets, ce qui fausse les largeurs de printf
     printf("Scénario        Véhicules Rechargés Refusés  Pannes Redir.   Interr. Attente moy  Occupation        CA"
            "   Durée\n");

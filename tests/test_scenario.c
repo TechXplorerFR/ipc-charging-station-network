@@ -135,7 +135,7 @@ static void testRandomScenarioWithFaults(void) {
     CHECK(runScenario(&scenario, 42, false, &again));
     CHECK(again.vehicles == 11);
 
-    printScenarioComparison((struct ScenarioResult[]){ result, again }, 2);
+    printScenarioComparison("Comparaison des scénarios", (struct ScenarioResult[]){ result, again }, 2);
 }
 
 int main(void) {
