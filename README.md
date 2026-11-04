@@ -29,9 +29,43 @@ annulation en file d'attente. `panne` utilise deux stations, huit véhicules,
 une annulation et une panne suivie d'une réparation. Les demandes sont traitées
 en parallèle et un rapport du réseau est affiché à la fin.
 
-Pour ajouter un scénario, créez un fichier dans `src/scenarios/` avec sa
-configuration de stations, de véhicules et d'événements, puis ajoutez-le à
-`src/CMakeLists.txt` et enregistrez-le dans `src/scenarios.c`.
+### Scénarios de circulation aléatoire
+
+Les scénarios suivants utilisent 3 stations de 4 bornes. Les véhicules y
+arrivent selon un processus de Poisson (type, batterie, station et priorité
+tirés au hasard) et certains simulent des pannes aléatoires avec réparation :
+
+| Scénario | Situation |
+|---|---|
+| `pointe` | heure de pointe : 40 véhicules à 3 arrivées/s, pannes rares |
+| `weekend` | week-end : 16 véhicules espacés, recharges plus longues |
+| `panne-generale` | jusqu'à 8 bornes sur 12 en panne en même temps |
+| `massive` | arrivée massive : 60 véhicules en quelques secondes |
+
+Les tirages sont reproductibles : chaque scénario a sa graine, que `--seed`
+remplace pour obtenir une autre circulation.
+
+```sh
+./launch/run_linux.sh -- pointe
+./launch/run_linux.sh -- pointe --seed 12
+```
+
+Pour comparer l'effet de la charge et des pannes sur les performances,
+`--compare` joue tous ces scénarios (sans leur journal détaillé, environ
+3 minutes) puis affiche un tableau : véhicules rechargés et refusés, pannes,
+recharges interrompues, attente moyenne, taux d'occupation, chiffre d'affaires.
+
+```sh
+./launch/run_linux.sh -- --compare
+```
+
+### Ajouter un scénario
+
+Créez un fichier dans `src/scenarios/` avec sa configuration de stations, de
+véhicules et d'événements scriptés, et/ou une configuration d'arrivées
+aléatoires (`struct GeneratorConfig`) et de pannes (`struct
+FaultSimulatorConfig`). Ajoutez-le ensuite à `src/CMakeLists.txt` et
+enregistrez-le dans `src/scenarios.c`.
 
 Pour compiler, exécuter tous les tests unitaires, puis lancer cette simulation :
 
