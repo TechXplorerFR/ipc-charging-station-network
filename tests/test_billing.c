@@ -69,6 +69,9 @@ static void testLoyaltyDiscount(void) {
     struct ChargingSession session = makeSession(50, 1.0);
 
     // Une seule session récente : pas encore fidèle
+    CHECK(!isLoyalCustomer(&DEFAULT_TARIFF, 1));
+    CHECK(isLoyalCustomer(&DEFAULT_TARIFF, 2));
+    CHECK(DEFAULT_TARIFF.loyaltyPriority);
     CHECK(computeInvoice(&DEFAULT_TARIFF, &session, false, 1).loyaltyDiscount == 0.0);
 
     struct Invoice invoice = computeInvoice(&DEFAULT_TARIFF, &session, false, 2);

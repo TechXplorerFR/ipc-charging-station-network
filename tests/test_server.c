@@ -160,6 +160,38 @@ static void testLoyalVehicleGetsDiscount(void) {
     shutdownServer(&server);
 }
 
+static void testLoyalVehicleOvertakesNormalInQueue(void) {
+    if (!setUp(1, 1)) {
+        return;
+    }
+    // Deux recharges récentes : le véhicule 1 devient client fidèle
+    for (int i = 0; i < 2; i++) {
+        demand(1, 0, 50);
+        CHECK(responseFor(1).request == RESP_ASSIGNED);
+        CHECK(handle(REQ_CHARGE_END, 1, 0, 0, 0));
+    }
+
+    demand(2, 0, 50);
+    CHECK(responseFor(2).request == RESP_ASSIGNED);
+    demand(3, 0, 50);
+    CHECK(responseFor(3).queue_position == 1);
+
+    // Le client fidèle passe devant le véhicule normal arrivé avant lui
+    demand(1, 0, 50);
+    Message queued = responseFor(1);
+    CHECK(queued.request == RESP_QUEUED);
+    CHECK(queued.queue_position == 1);
+    CHECK(waitQueuePosition(&server.stations[0].waitQueue, 3) == 2);
+
+    // Priorité désactivée dans le tarif : il reprend sa place dans l'ordre d'arrivée
+    CHECK(handle(REQ_CANCEL, 1, 0, -1, 0));
+    server.tariff.loyaltyPriority = false;
+    demand(1, 0, 50);
+    CHECK(responseFor(1).queue_position == 2);
+
+    shutdownServer(&server);
+}
+
 static void testFaultRedirectsToAnotherStationWhenQueueIsFull(void) {
     if (!setUp(2, 1)) {
         return;
@@ -315,6 +347,7 @@ int main(void) {
     RUN_TEST(testChargeEndServesNextInQueue);
     RUN_TEST(testFaultNotifiesThenRepairServesQueue);
     RUN_TEST(testLoyalVehicleGetsDiscount);
+    RUN_TEST(testLoyalVehicleOvertakesNormalInQueue);
     RUN_TEST(testFaultRedirectsToAnotherStationWhenQueueIsFull);
     RUN_TEST(testInvalidRequestsAreIgnored);
     RUN_TEST(testCancelAndPong);

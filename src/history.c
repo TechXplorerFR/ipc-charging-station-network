@@ -1,4 +1,5 @@
 #include "history.h"
+#include "sim_time.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -111,10 +112,10 @@ void printHistory(struct History* history, int maxRecords) {
     printf("Historique (%d dernière(s) session(s) sur %d) :\n", history->count - first, history->count);
     for (int i = first; i < history->count; i++) {
         const struct SessionRecord* record = &history->records[i];
-        printf("  #%d véhicule %d%s, station %d borne %d : %.2f kWh à %d kW en %.1f s, %.2f €%s\n", i + 1,
+        printf("  #%d véhicule %d%s, station %d borne %d : %.2f kWh à %d kW en %.1f min, %.2f €%s\n", i + 1,
                record->vehicleId, record->isPrioritary ? " (prioritaire)" : "", record->stationId,
-               record->chargerId, record->energyKWh, record->power, record->durationSeconds, record->cost,
-               record->interrupted ? ", interrompue" : "");
+               record->chargerId, record->energyKWh, record->power, simulatedMinutes(record->durationSeconds),
+               record->cost, record->interrupted ? ", interrompue" : "");
     }
     pthread_mutex_unlock(&history->lock);
 }
@@ -126,13 +127,13 @@ bool exportHistoryCsv(struct History* history, const char* path) {
         return false;
     }
 
-    fprintf(file, "vehicule;station;borne;puissance_kW;energie_kWh;duree_s;cout_EUR;interrompue;prioritaire\n");
+    fprintf(file, "vehicule;station;borne;puissance_kW;energie_kWh;duree_min;cout_EUR;interrompue;prioritaire\n");
     pthread_mutex_lock(&history->lock);
     for (int i = 0; i < history->count; i++) {
         const struct SessionRecord* record = &history->records[i];
         fprintf(file, "%d;%d;%d;%d;%.3f;%.1f;%.2f;%d;%d\n", record->vehicleId, record->stationId,
-                record->chargerId, record->power, record->energyKWh, record->durationSeconds, record->cost,
-                record->interrupted ? 1 : 0, record->isPrioritary ? 1 : 0);
+                record->chargerId, record->power, record->energyKWh, simulatedMinutes(record->durationSeconds),
+                record->cost, record->interrupted ? 1 : 0, record->isPrioritary ? 1 : 0);
     }
     pthread_mutex_unlock(&history->lock);
 

@@ -29,7 +29,12 @@ les dernières sessions. Tarif par défaut (`DEFAULT_TARIFF`, `billing.c`) :
 
 - 0,35 €/kWh, plus 0,15 €/kWh pour une recharge rapide (au-delà de 50 kW) ;
 - 1 € de frais fixes par session, offerts si une panne interrompt la recharge ;
-- 10 % de remise pour un client fidèle (au moins 2 sessions dans les
-  10 dernières minutes réelles, soit 10 h simulées).
+- client fidèle : au moins 2 sessions dans les 10 dernières minutes réelles
+  (soit 10 h simulées). Il bénéficie de 10 % de remise et passe devant les
+  véhicules normaux dans la file d'attente, derrière les véhicules
+  prioritaires (urgences, bus).
 
-Le temps est accéléré : une seconde réelle représente une minute de recharge.
+Le temps est accéléré : une seconde réelle représente une minute simulée.
+Toutes les durées affichées (recharges, attentes, historique, export CSV)
+sont en minutes simulées : 1,02 kWh à 22 kW prend 2,8 min simulées, soit
+2,8 s réelles.

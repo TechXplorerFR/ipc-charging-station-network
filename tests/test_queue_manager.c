@@ -123,6 +123,26 @@ static void testLongWaitingVehicleOvertakesLaterPrioritary(void) {
     CHECK(promoteLongWaitingVehicles(&queue, PRIORITY_AGING_SECONDS) == 0);
 }
 
+static void testLoyalVehiclesGoBetweenPrioritaryAndNormal(void) {
+    struct WaitQueue queue;
+    initWaitQueue(&queue);
+    CHECK(enqueue(&queue, 1, PRIORITY_NORMAL));
+    CHECK(enqueue(&queue, 2, PRIORITY_LOYAL));
+    CHECK(enqueue(&queue, 3, PRIORITY_HIGH));
+    CHECK(enqueue(&queue, 4, PRIORITY_LOYAL));
+
+    // Un client fidèle qui attend longtemps est promu comme un véhicule normal
+    age(&queue, 4, 100);
+    CHECK(promoteLongWaitingVehicles(&queue, PRIORITY_AGING_SECONDS) == 1);
+    CHECK(queue.vehicles[0].vehicleId == 4);
+    CHECK(queue.vehicles[0].priority == PRIORITY_HIGH);
+
+    CHECK(dequeueId(&queue) == 4);
+    CHECK(dequeueId(&queue) == 3);
+    CHECK(dequeueId(&queue) == 2);
+    CHECK(dequeueId(&queue) == 1);
+}
+
 static void testPromotedVehicleStaysBehindEarlierPrioritary(void) {
     struct WaitQueue queue;
     initWaitQueue(&queue);
@@ -195,6 +215,7 @@ int main(void) {
     RUN_TEST(testRejectsDuplicatesAndOverflow);
     RUN_TEST(testWaitingTimeStartsAtEnqueue);
     RUN_TEST(testLongWaitingVehicleOvertakesLaterPrioritary);
+    RUN_TEST(testLoyalVehiclesGoBetweenPrioritaryAndNormal);
     RUN_TEST(testPromotedVehicleStaysBehindEarlierPrioritary);
     RUN_TEST(testExpiredVehiclesAreRemoved);
     RUN_TEST(testStatsCountEveryExit);

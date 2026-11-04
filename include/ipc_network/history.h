@@ -15,7 +15,7 @@ struct SessionRecord {
     int chargerId;
     int power; // kW délivrés
     double energyKWh;
-    double durationSeconds;
+    double durationSeconds; // Durée réelle, affichée en minutes simulées (simulatedMinutes)
     double cost; // € facturés
     bool interrupted;
     bool isPrioritary;
