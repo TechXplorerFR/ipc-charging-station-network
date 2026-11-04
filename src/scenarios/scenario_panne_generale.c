@@ -6,15 +6,15 @@ static const struct GeneratorConfig generator = {
     .arrivalRate = 1.5,
     .maxVehicles = 30,
     .prioritaryRate = 0.05,
-    .minInitialLevel = 0.90,
-    .maxInitialLevel = 0.96,
+    .minInitialLevel = 0.94,
+    .maxInitialLevel = 0.98,
     .seed = 2028,
 };
 
 static const struct FaultSimulatorConfig faults = {
     .faultRate = 1.5,
-    .minRepairSeconds = 4.0,
-    .maxRepairSeconds = 8.0,
+    .minRepairSeconds = 3.0,
+    .maxRepairSeconds = 6.0,
     .maxConcurrentFaults = 8,
     .seed = 71,
 };

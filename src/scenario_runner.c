@@ -439,8 +439,9 @@ bool runScenario(const struct Scenario* scenario, uint64_t seed, bool printRepor
 
 void printScenarioComparison(const struct ScenarioResult* results, int count) {
     printf("\n========== Comparaison des scénarios ==========\n");
-    printf("%-15s %9s %9s %7s %7s %6s %9s %11s %10s %9s %7s\n", "Scénario", "Véhicules", "Rechargés", "Refusés",
-           "Pannes", "Redir.", "Interr.", "Attente moy", "Occupation", "CA", "Durée");
+    // En-tête aligné à la main : les lettres accentuées occupent deux octets, ce qui fausse les largeurs de printf
+    printf("Scénario        Véhicules Rechargés Refusés  Pannes Redir.   Interr. Attente moy  Occupation        CA"
+           "   Durée\n");
     for (int i = 0; i < count; i++) {
         const struct ScenarioResult* r = &results[i];
         printf("%-15s %9d %9d %7d %7d %6d %9d %7.1f min %9.1f %% %7.2f € %5.1f s%s\n", r->name, r->vehicles,

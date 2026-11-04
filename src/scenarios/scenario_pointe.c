@@ -3,10 +3,10 @@
 // Heure de pointe : arrivées soutenues sur tout le réseau, quelques véhicules d'urgence et de rares pannes
 static const struct GeneratorConfig generator = {
     .arrivalRate = 3.0,
-    .maxVehicles = 45,
+    .maxVehicles = 40,
     .prioritaryRate = 0.05,
-    .minInitialLevel = 0.88,
-    .maxInitialLevel = 0.96,
+    .minInitialLevel = 0.94,
+    .maxInitialLevel = 0.98,
     .seed = 2026,
 };
 
@@ -20,7 +20,7 @@ static const struct FaultSimulatorConfig faults = {
 
 const struct Scenario scenarioPointe = {
     .name = "pointe",
-    .description = "heure de pointe : 3 stations de 4 bornes, 45 véhicules aléatoires, pannes rares",
+    .description = "heure de pointe : 3 stations de 4 bornes, 40 véhicules aléatoires, pannes rares",
     .numStations = 3,
     .chargersPerStation = 4,
     .generator = &generator,

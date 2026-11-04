@@ -78,11 +78,11 @@ static void testInvalidScenariosAreRejected(void) {
 
 static void testScriptedScenarioChargesEveryVehicle(void) {
     struct ScenarioResult result;
-    CHECK(runScenario(findScenario("petit"), 0, false, &result));
+    CHECK(runScenario(findScenario("affluence"), 0, false, &result));
     CHECK(result.succeeded);
-    CHECK(strcmp(result.name, "petit") == 0);
-    CHECK(result.vehicles == 3);
-    CHECK(result.charged == 3);
+    CHECK(strcmp(result.name, "affluence") == 0);
+    CHECK(result.vehicles == 6);
+    CHECK(result.charged == 6);
     CHECK(result.refused == 0);
     CHECK(result.faults == 0);
     CHECK(result.revenue > 0.0);
