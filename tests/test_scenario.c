@@ -81,6 +81,7 @@ static void testScriptedScenarioChargesEveryVehicle(void) {
     CHECK(runScenario(findScenario("affluence"), 0, false, &result));
     CHECK(result.succeeded);
     CHECK(strcmp(result.name, "affluence") == 0);
+    CHECK(!result.randomTraffic);
     CHECK(result.vehicles == 6);
     CHECK(result.charged == 6);
     CHECK(result.refused == 0);
@@ -124,6 +125,7 @@ static void testRandomScenarioWithFaults(void) {
     CHECK(runScenario(&scenario, 0, true, &result));
     CHECK(result.succeeded);
     CHECK(result.vehicles == 11);
+    CHECK(result.randomTraffic);
     CHECK(result.charged + result.refused == 11);
     CHECK(result.charged >= 1);
     CHECK(result.interruptedCharges <= result.faults);

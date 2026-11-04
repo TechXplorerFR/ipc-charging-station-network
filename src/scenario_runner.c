@@ -388,7 +388,10 @@ static void collectServerResult(struct Server* server, struct ScenarioResult* re
 }
 
 bool runScenario(const struct Scenario* scenario, uint64_t seed, bool printReport, struct ScenarioResult* result) {
-    *result = (struct ScenarioResult){ .name = scenario != NULL ? scenario->name : "?" };
+    *result = (struct ScenarioResult){
+        .name = scenario != NULL ? scenario->name : "?",
+        .randomTraffic = scenario != NULL && scenario->generator != NULL,
+    };
     if (!isValidScenario(scenario)) {
         fprintf(stderr, "[SIMULATION] Configuration invalide pour le scénario « %s ».\n", result->name);
         return false;
@@ -439,13 +442,15 @@ bool runScenario(const struct Scenario* scenario, uint64_t seed, bool printRepor
 
 void printScenarioComparison(const char* title, const struct ScenarioResult* results, int count) {
     printf("\n========== %s ==========\n", title);
-    // En-tête aligné à la main : les lettres accentuées occupent deux octets, ce qui fausse les largeurs de printf
-    printf("Scénario        Véhicules Rechargés Refusés  Pannes Redir.   Interr. Attente moy  Occupation        CA"
-           "   Durée\n");
+    // En-tête et type alignés à la main : les lettres accentuées occupent deux octets, ce qui fausse les largeurs
+    // de printf
+    printf("Scénario        Type      Véhicules Rechargés Refusés  Pannes Redir.   Interr. Attente moy  Occupation"
+           "        CA   Durée\n");
     for (int i = 0; i < count; i++) {
         const struct ScenarioResult* r = &results[i];
-        printf("%-15s %9d %9d %7d %7d %6d %9d %7.1f min %9.1f %% %7.2f € %5.1f s%s\n", r->name, r->vehicles,
-               r->charged, r->refused, r->faults, r->redirections, r->interruptedCharges, r->averageWaitMinutes,
-               r->occupancyRate * 100.0, r->revenue, r->durationSeconds, r->succeeded ? "" : "  (échec)");
+        printf("%-15s %s %9d %9d %7d %7d %6d %9d %7.1f min %9.1f %% %7.2f € %5.1f s%s\n", r->name,
+               r->randomTraffic ? "aléatoire" : "scripté  ", r->vehicles, r->charged, r->refused, r->faults,
+               r->redirections, r->interruptedCharges, r->averageWaitMinutes, r->occupancyRate * 100.0, r->revenue,
+               r->durationSeconds, r->succeeded ? "" : "  (échec)");
     }
 }

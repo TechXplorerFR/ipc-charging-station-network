@@ -50,6 +50,7 @@ struct Scenario {
 // Mesures d'une exécution, pour comparer l'effet de la charge et des pannes sur les performances
 struct ScenarioResult {
     const char* name;
+    bool randomTraffic;        // Arrivées aléatoires (generator) ; sinon scénario uniquement scripté
     bool succeeded;            // Pas d'erreur, et tous les véhicules scriptés ont terminé leur recharge
     int vehicles;              // Véhicules lancés, scriptés et aléatoires
     int charged;               // Véhicules repartis batterie pleine

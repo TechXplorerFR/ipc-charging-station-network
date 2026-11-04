@@ -58,9 +58,16 @@ final les compare : véhicules rechargés et refusés, pannes, recharges
 interrompues, attente moyenne, taux d'occupation, chiffre d'affaires.
 `--quiet` n'affiche que ce tableau.
 
+Avec `--all`, la comparaison joue aussi les 4 scénarios scriptés (`standard`,
+`panne`, `affluence`, `petit`), marqués « scripté » dans la colonne Type. Leurs
+réseaux et leurs véhicules diffèrent : ils démontrent un mécanisme (file,
+annulation, panne) et leurs chiffres ne se comparent pas directement à ceux
+des scénarios aléatoires, qui partagent tous le même réseau.
+
 ```sh
 ./launch/run_linux.sh -- --compare
 ./launch/run_linux.sh -- --compare --quiet
+./launch/run_linux.sh -- --compare --all
 ```
 
 ### Ajouter un scénario

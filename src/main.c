@@ -9,10 +9,10 @@
 
 static void printUsage(const char* program) {
     printf("Usage : %s [scénario] [--seed N]\n", program);
-    printf("        %s --compare [--quiet] [--seed N]   joue les scénarios à circulation aléatoire et les compare\n",
-           program);
-    printf("        %s --list                           liste les scénarios\n", program);
+    printf("        %s --compare [--all] [--quiet] [--seed N]   joue les scénarios et les compare\n", program);
+    printf("        %s --list                                   liste les scénarios\n", program);
     printf("Sans scénario, « standard » est joué. --seed change les tirages aléatoires (0 : graine du scénario).\n");
+    printf("--compare joue les scénarios à circulation aléatoire ; avec --all, aussi les scénarios scriptés.\n");
     printf("Avec --quiet, --compare n'affiche que le tableau comparatif, sans le journal ni le rapport de chaque "
            "scénario.\n");
 }
@@ -50,13 +50,14 @@ static void restoreStdout(int saved) {
     }
 }
 
-// Joue l'un après l'autre les scénarios à circulation aléatoire, chacun avec son journal et son rapport comme
-// une exécution classique (sauf quiet), puis affiche le tableau comparatif
-static int compareScenarios(uint64_t seed, bool quiet) {
+// Joue l'un après l'autre les scénarios à circulation aléatoire (tous avec includeScripted), chacun avec son
+// journal et son rapport comme une exécution classique (sauf quiet), puis affiche le tableau comparatif.
+// Seuls les scénarios aléatoires partagent le même réseau : les scriptés servent à démontrer un mécanisme.
+static int compareScenarios(uint64_t seed, bool quiet, bool includeScripted) {
     const struct Scenario* compared[32];
     int total = 0;
     for (int i = 0; i < scenarioCount() && total < (int)(sizeof(compared) / sizeof(compared[0])); i++) {
-        if (scenarioAt(i)->generator != NULL) {
+        if (includeScripted || scenarioAt(i)->generator != NULL) {
             compared[total++] = scenarioAt(i);
         }
     }
@@ -84,6 +85,7 @@ int main(int argc, char* argv[]) {
     const char* scenarioName = "standard";
     bool compare = false;
     bool quiet = false;
+    bool includeScripted = false;
     uint64_t seed = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -95,6 +97,8 @@ int main(int argc, char* argv[]) {
             return 0;
         } else if (strcmp(argv[i], "--compare") == 0) {
             compare = true;
+        } else if (strcmp(argv[i], "--all") == 0 || strcmp(argv[i], "-a") == 0) {
+            includeScripted = true;
         } else if (strcmp(argv[i], "--quiet") == 0 || strcmp(argv[i], "-q") == 0) {
             quiet = true;
         } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
@@ -111,8 +115,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (compare) {
-        return compareScenarios(seed, quiet);
+    // --all sans --compare : la comparaison est sous-entendue
+    if (compare || includeScripted) {
+        return compareScenarios(seed, quiet, includeScripted);
     }
 
     const struct Scenario* scenario = findScenario(scenarioName);

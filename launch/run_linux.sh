@@ -9,7 +9,7 @@ usage() {
     echo "  --clean     Supprime le dossier de compilation avant de compiler"
     echo "  --test      Exécute les tests (ctest) après la compilation"
     echo "  --no-run    Compile sans lancer l'application"
-    echo "  --          Transmet le scénario et ses options à l'application (ex. -- pointe --seed 12, -- --compare --quiet)"
+    echo "  --          Transmet le scénario et ses options à l'application (ex. -- pointe --seed 12, -- --compare --all)"
     echo "  -h, --help  Affiche cette aide"
 }
 
