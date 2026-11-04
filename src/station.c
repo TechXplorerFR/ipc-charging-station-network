@@ -223,8 +223,8 @@ void printStation(struct Station* station) {
         printf("  Borne %d (%d kW) : %s", charger->id, charger->maxPower, chargerStatusName(charger->status));
         if (charger->status == OCCUPIED) {
             const struct ChargingSession* session = &charger->session;
-            printf(", véhicule %d à %d kW depuis %.1f s (%.1f kWh)", session->vehicleId, session->power,
-                   sessionDurationSeconds(session), sessionEnergyKWh(session));
+            printf(", véhicule %d à %d kW depuis %.1f min (%.1f kWh)", session->vehicleId, session->power,
+                   simulatedMinutes(sessionDurationSeconds(session)), sessionEnergyKWh(session));
         }
         printf("\n");
     }

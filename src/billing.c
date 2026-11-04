@@ -9,12 +9,17 @@ const struct Tariff DEFAULT_TARIFF = {
     .loyaltyMinSessions = 2,
     .loyaltyWindowSeconds = 600.0,
     .loyaltyDiscountRate = 0.10,
+    .loyaltyPriority = true,
 };
 
 bool isValidTariff(const struct Tariff* tariff) {
     return tariff->pricePerKWh >= 0.0 && tariff->fastChargePowerKW >= 0 && tariff->fastChargeSurchargePerKWh >= 0.0
         && tariff->sessionFee >= 0.0 && tariff->loyaltyMinSessions >= 1 && tariff->loyaltyWindowSeconds >= 0.0
         && tariff->loyaltyDiscountRate >= 0.0 && tariff->loyaltyDiscountRate <= 1.0;
+}
+
+bool isLoyalCustomer(const struct Tariff* tariff, int recentSessions) {
+    return recentSessions >= tariff->loyaltyMinSessions;
 }
 
 struct Invoice computeInvoice(const struct Tariff* tariff, const struct ChargingSession* session, bool interrupted,
@@ -34,7 +39,7 @@ struct Invoice computeInvoice(const struct Tariff* tariff, const struct Charging
     invoice.sessionFee = interrupted ? 0.0 : tariff->sessionFee;
 
     double subtotal = invoice.energyCost + invoice.sessionFee;
-    if (recentSessions >= tariff->loyaltyMinSessions) {
+    if (isLoyalCustomer(tariff, recentSessions)) {
         invoice.loyaltyDiscount = subtotal * tariff->loyaltyDiscountRate;
     }
     invoice.total = subtotal - invoice.loyaltyDiscount;
@@ -42,8 +47,9 @@ struct Invoice computeInvoice(const struct Tariff* tariff, const struct Charging
 }
 
 void printInvoice(const struct Invoice* invoice) {
-    printf("[FACTURE] Véhicule %d : %.2f kWh à %d kW × %.2f €/kWh = %.2f €", invoice->vehicleId, invoice->energyKWh,
-           invoice->power, invoice->unitPrice, invoice->energyCost);
+    printf("[FACTURE] Véhicule %d : %.2f kWh à %d kW en %.1f min × %.2f €/kWh = %.2f €", invoice->vehicleId,
+           invoice->energyKWh, invoice->power, simulatedMinutes(invoice->durationSeconds), invoice->unitPrice,
+           invoice->energyCost);
     if (invoice->sessionFee > 0.0) {
         printf(" + %.2f € de frais", invoice->sessionFee);
     }

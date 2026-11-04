@@ -1,4 +1,5 @@
 #include "queue_manager.h"
+#include "sim_time.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -84,7 +85,7 @@ int promoteLongWaitingVehicles(struct WaitQueue* queue, double agingSeconds) {
     int promoted = 0;
     for (int i = 0; i < queue->count; i++) {
         struct WaitingVehicle vehicle = queue->vehicles[i];
-        if (vehicle.priority != PRIORITY_NORMAL || waitingTimeSeconds(&vehicle) < agingSeconds) {
+        if (vehicle.priority == PRIORITY_HIGH || waitingTimeSeconds(&vehicle) < agingSeconds) {
             continue;
         }
 
@@ -146,6 +147,18 @@ double averageWaitSeconds(const struct WaitQueue* queue) {
     return queue->stats.totalServedWaitSeconds / queue->stats.served;
 }
 
+static const char* priorityLabel(VehiclePriority priority) {
+    switch (priority) {
+        case PRIORITY_NORMAL:
+            return "";
+        case PRIORITY_LOYAL:
+            return ", client fidèle";
+        case PRIORITY_HIGH:
+            return ", prioritaire";
+    }
+    return "";
+}
+
 void printWaitQueue(const struct WaitQueue* queue) {
     if (queue->count == 0) {
         printf("  File d'attente vide\n");
@@ -153,13 +166,14 @@ void printWaitQueue(const struct WaitQueue* queue) {
         printf("  File d'attente (%d véhicule(s)) :\n", queue->count);
         for (int i = 0; i < queue->count; i++) {
             const struct WaitingVehicle* vehicle = &queue->vehicles[i];
-            printf("    %d. véhicule %d, %d kW%s, attend depuis %.1f s\n", i + 1, vehicle->vehicleId,
-                   vehicle->desiredPower, vehicle->priority == PRIORITY_HIGH ? ", prioritaire" : "",
-                   waitingTimeSeconds(vehicle));
+            printf("    %d. véhicule %d, %d kW%s, attend depuis %.1f min\n", i + 1, vehicle->vehicleId,
+                   vehicle->desiredPower, priorityLabel(vehicle->priority),
+                   simulatedMinutes(waitingTimeSeconds(vehicle)));
         }
     }
 
     const struct WaitQueueStats* stats = &queue->stats;
-    printf("  Servis : %d (attente moyenne %.1f s), abandons : %d, attentes expirées : %d, refus : %d\n",
-           stats->served, averageWaitSeconds(queue), stats->cancelled, stats->expired, stats->rejected);
+    printf("  Servis : %d (attente moyenne %.1f min), abandons : %d, attentes expirées : %d, refus : %d\n",
+           stats->served, simulatedMinutes(averageWaitSeconds(queue)), stats->cancelled, stats->expired,
+           stats->rejected);
 }

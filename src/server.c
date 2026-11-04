@@ -173,6 +173,21 @@ static void redirectVehicle(struct Server* server, struct Station* origin, const
     sendAssignment(server, interrupted->vehicleId, target, &assignment, interrupted->desiredPower);
 }
 
+// Urgence et transport public d'abord, puis les clients fidèles d'après l'historique, puis les autres
+static VehiclePriority demandPriority(struct Server* server, const Message* msg) {
+    if (msg->is_prioritary) {
+        return PRIORITY_HIGH;
+    }
+    if (server->tariff.loyaltyPriority) {
+        int recentSessions =
+            countRecentSessions(&server->history, msg->vehicle_id, server->tariff.loyaltyWindowSeconds);
+        if (isLoyalCustomer(&server->tariff, recentSessions)) {
+            return PRIORITY_LOYAL;
+        }
+    }
+    return PRIORITY_NORMAL;
+}
+
 static void handleChargeDemand(struct Server* server, const Message* msg) {
     struct Station* station = findStation(server, msg->station_id);
     if (station == NULL) {
@@ -180,12 +195,14 @@ static void handleChargeDemand(struct Server* server, const Message* msg) {
         return;
     }
 
+    VehiclePriority priority = demandPriority(server, msg);
     printf("[SERVEUR] Véhicule %d : demande de %d kW sur la station %d%s.\n", msg->vehicle_id, msg->desired_power,
-           station->id, msg->is_prioritary ? " (prioritaire)" : "");
+           station->id, priority == PRIORITY_HIGH ? " (prioritaire)"
+                        : priority == PRIORITY_LOYAL ? " (client fidèle)" : "");
     struct WaitingVehicle vehicle = {
         .vehicleId = msg->vehicle_id,
         .desiredPower = msg->desired_power,
-        .priority = msg->is_prioritary ? PRIORITY_HIGH : PRIORITY_NORMAL,
+        .priority = priority,
     };
     struct Assignment assignment = requestCharger(station, &vehicle);
     if (assignment.result == ASSIGN_OK) {
@@ -215,9 +232,9 @@ static void handleChargeEnd(struct Server* server, const Message* msg) {
     }
 
     server->stats.completedCharges++;
-    printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d (%.1f kWh en %.1f s).\n",
+    printf("[SERVEUR] Véhicule %d : recharge terminée sur la borne %d de la station %d (%.1f kWh en %.1f min).\n",
            finished.vehicleId, msg->charger_id, station->id, sessionEnergyKWh(&finished),
-           sessionDurationSeconds(&finished));
+           simulatedMinutes(sessionDurationSeconds(&finished)));
     recordSession(server, station->id, msg->charger_id, &finished, false);
 
     if (result == HANDOVER_REASSIGNED) {
@@ -454,8 +471,8 @@ void printServerReport(struct Server* server) {
     struct HistorySummary networkSummary = summarizeHistory(&server->history, ALL_STATIONS);
     printf("Chiffre d'affaires : %.2f € (%.2f € par session en moyenne)\n", networkSummary.revenue,
            networkSummary.sessions > 0 ? networkSummary.revenue / networkSummary.sessions : 0.0);
-    printf("Temps d'attente moyen : %.1f s sur %d véhicule(s) servi(s)\n",
-           servedVehicles > 0 ? totalWaitSeconds / servedVehicles : 0.0, servedVehicles);
+    printf("Temps d'attente moyen : %.1f min sur %d véhicule(s) servi(s)\n",
+           simulatedMinutes(servedVehicles > 0 ? totalWaitSeconds / servedVehicles : 0.0), servedVehicles);
     printf("Pannes : %d, réparations : %d, redirections vers une autre station : %d\n", stats->faults,
            stats->repairs, stats->redirections);
     printf("Refus : %d, requêtes reçues : %d (dont %d incohérentes)\n", stats->refused, stats->requests,

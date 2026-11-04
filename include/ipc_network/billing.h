@@ -13,10 +13,11 @@ struct Tariff {
     int loyaltyMinSessions;           // Sessions récentes nécessaires pour être client fidèle
     double loyaltyWindowSeconds;      // Fenêtre (temps réel) dans laquelle une session compte comme récente
     double loyaltyDiscountRate;       // Remise accordée aux clients fidèles (0 à 1)
+    bool loyaltyPriority;             // Les clients fidèles passent devant les véhicules normaux dans la file
 };
 
-// 0,35 €/kWh, +0,15 €/kWh au-delà de 50 kW, 1 € par session, 10 % de remise dès 2 sessions
-// dans les 10 dernières minutes réelles (10 h simulées)
+// 0,35 €/kWh, +0,15 €/kWh au-delà de 50 kW, 1 € par session ; client fidèle dès 2 sessions dans les
+// 10 dernières minutes réelles (10 h simulées) : 10 % de remise et priorité sur les véhicules normaux
 extern const struct Tariff DEFAULT_TARIFF;
 
 // Détail du coût d'une session de recharge
@@ -24,7 +25,7 @@ struct Invoice {
     int vehicleId;
     int power;              // kW délivrés
     double energyKWh;
-    double durationSeconds; // Durée réelle de la session
+    double durationSeconds; // Durée réelle de la session, affichée en minutes simulées
     double unitPrice;       // € par kWh appliqués, supplément de charge rapide compris
     double energyCost;
     double sessionFee;
@@ -34,6 +35,10 @@ struct Invoice {
 };
 
 bool isValidTariff(const struct Tariff* tariff);
+
+// Client fidèle : au moins loyaltyMinSessions sessions dans la fenêtre de fidélité (recentSessions, voir
+// countRecentSessions dans history.h)
+bool isLoyalCustomer(const struct Tariff* tariff, int recentSessions);
 
 // Facture une session terminée (ou interrompue) ; recentSessions est le nombre de sessions du véhicule
 // enregistrées dans la fenêtre de fidélité (voir countRecentSessions dans history.h)

@@ -7,16 +7,18 @@
 // Capacité de la file d'attente d'une station : au-delà, les demandes sont refusées
 #define MAX_WAITING_VEHICLES 64
 
-// Attente au-delà de laquelle un véhicule normal devient prioritaire, pour qu'un flot continu
-// de véhicules prioritaires ne le fasse pas attendre indéfiniment
+// Attente (s réelles, 1 h simulée) au-delà de laquelle un véhicule normal ou fidèle devient prioritaire,
+// pour qu'un flot continu de véhicules prioritaires ne le fasse pas attendre indéfiniment
 #define PRIORITY_AGING_SECONDS 60.0
 
-// Attente maximale conseillée avant d'abandonner une demande (voir removeExpiredVehicles)
+// Attente maximale conseillée (s réelles, 5 h simulées) avant d'abandonner une demande (voir removeExpiredVehicles)
 #define MAX_WAIT_SECONDS 300.0
 
+// Du moins au plus prioritaire : la file compare les valeurs
 typedef enum {
     PRIORITY_NORMAL,
-    PRIORITY_HIGH // Véhicule d'urgence, transport public, ou véhicule normal promu après une longue attente
+    PRIORITY_LOYAL, // Client fidèle (voir isLoyalCustomer dans billing.h) : devant les véhicules normaux
+    PRIORITY_HIGH   // Véhicule d'urgence, transport public, ou véhicule promu après une longue attente
 } VehiclePriority;
 
 struct WaitingVehicle {
@@ -61,7 +63,7 @@ bool dequeueNextVehicle(struct WaitQueue* queue, struct WaitingVehicle* next);
 // Retire un véhicule qui abandonne l'attente ; renvoie false s'il n'était pas dans la file
 bool removeWaitingVehicle(struct WaitQueue* queue, int vehicleId);
 
-// Rend prioritaires les véhicules normaux qui attendent depuis au moins agingSeconds ; chacun se place
+// Rend prioritaires les véhicules normaux ou fidèles qui attendent depuis au moins agingSeconds ; chacun se place
 // parmi les prioritaires selon son heure d'arrivée. Renvoie le nombre de véhicules promus.
 int promoteLongWaitingVehicles(struct WaitQueue* queue, double agingSeconds);
 

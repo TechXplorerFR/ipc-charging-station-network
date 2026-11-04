@@ -64,6 +64,14 @@ static void testEnergyUsesSimulatedTime(void) {
     CHECK(energy > 49.99 && energy < 50.01);
 }
 
+static void testDurationInSimulatedMinutes(void) {
+    // 1,02 kWh à 22 kW = 0,0464 h = 2,78 min simulées, soit 2,78 s réelles
+    double realSeconds = 1.02 / 22.0 * 3600.0 / SIMULATED_SECONDS_PER_SECOND;
+    CHECK(realSeconds > 2.77 && realSeconds < 2.79);
+    CHECK(simulatedMinutes(realSeconds) > 2.77 && simulatedMinutes(realSeconds) < 2.79);
+    CHECK(simulatedMinutes(60.0) == 60.0); // 1 min réelle = 1 h simulée
+}
+
 int main(void) {
     RUN_TEST(testStatusNames);
     RUN_TEST(testOutOfOrderStatuses);
@@ -71,5 +79,6 @@ int main(void) {
     RUN_TEST(testStartAndClearSession);
     RUN_TEST(testEndedSessionStopsCounting);
     RUN_TEST(testEnergyUsesSimulatedTime);
+    RUN_TEST(testDurationInSimulatedMinutes);
     return TEST_RESULT();
 }

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <time.h>
+#include "sim_time.h"
 
 typedef enum {
     AVAILABLE,
@@ -13,9 +14,6 @@ typedef enum {
 
 // Valeur de ChargingSession.vehicleId lorsqu'aucun véhicule n'utilise la borne
 #define NO_VEHICLE (-1)
-
-// Accélération de la simulation : une seconde réelle représente une minute de recharge
-#define SIMULATED_SECONDS_PER_SECOND 60.0
 
 // Recharge sur une borne : de quoi facturer la session et rediriger le véhicule en cas de panne
 struct ChargingSession {
