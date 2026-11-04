@@ -9,6 +9,11 @@ set(IPC_MODULE_SOURCES
     queue_manager.c
     random.c
     server.c
+    scenarios.c
+    scenarios/scenario_affluence.c
+    scenarios/scenario_panne.c
+    scenarios/scenario_petit.c
+    scenarios/scenario_standard.c
     station.c
     vehicle.c
     vehicle_generator.c

@@ -1,14 +1,15 @@
 #!/bin/bash
 
-# Usage : ./launch/run_linux.sh [--release] [--clean] [--test] [--no-run] [-- args de l'application]
+# Usage : ./launch/run_linux.sh [options] [-- [scénario]]
 
 usage() {
-    echo "Usage : $0 [options] [-- arguments de l'application]"
+    echo "Usage : $0 [options] [-- [scénario]]"
     echo ""
     echo "  --release   Compilation en mode Release (Debug par défaut)"
     echo "  --clean     Supprime le dossier de compilation avant de compiler"
     echo "  --test      Exécute les tests (ctest) après la compilation"
     echo "  --no-run    Compile sans lancer l'application"
+    echo "  --          Transmet le nom du scénario à l'application (ex. panne)"
     echo "  -h, --help  Affiche cette aide"
 }
 
