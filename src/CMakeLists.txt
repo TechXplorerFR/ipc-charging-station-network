@@ -3,9 +3,11 @@ set(IPC_MODULE_SOURCES
     allocator.c
     billing.c
     charger.c
+    fault_simulator.c
     history.c
     message_queue.c
     queue_manager.c
+    random.c
     server.c
     station.c
     vehicle.c
@@ -16,7 +18,7 @@ set(IPC_MODULE_SOURCES
 add_library(ipc_network STATIC ${IPC_MODULE_SOURCES})
 ipc_configure_target(ipc_network)
 target_include_directories(ipc_network PUBLIC ${IPC_INCLUDE_DIR})
-# m : log() et round() (vehicle_generator)
+# m : log() (random) et round() (vehicle_generator)
 target_link_libraries(ipc_network PUBLIC Threads::Threads m)
 
 # Exécutable final
