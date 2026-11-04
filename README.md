@@ -29,9 +29,54 @@ annulation en file d'attente. `panne` utilise deux stations, huit véhicules,
 une annulation et une panne suivie d'une réparation. Les demandes sont traitées
 en parallèle et un rapport du réseau est affiché à la fin.
 
-Pour ajouter un scénario, créez un fichier dans `src/scenarios/` avec sa
-configuration de stations, de véhicules et d'événements, puis ajoutez-le à
-`src/CMakeLists.txt` et enregistrez-le dans `src/scenarios.c`.
+### Scénarios de circulation aléatoire
+
+Les scénarios suivants utilisent 3 stations de 4 bornes. Les véhicules y
+arrivent selon un processus de Poisson (type, batterie, station et priorité
+tirés au hasard) et certains simulent des pannes aléatoires avec réparation :
+
+| Scénario | Situation |
+|---|---|
+| `pointe` | heure de pointe : 40 véhicules à 3 arrivées/s, pannes rares |
+| `weekend` | week-end : 16 véhicules espacés, recharges plus longues |
+| `panne-generale` | jusqu'à 8 bornes sur 12 en panne en même temps |
+| `massive` | arrivée massive : 60 véhicules en quelques secondes |
+
+Les tirages sont reproductibles : chaque scénario a sa graine, que `--seed`
+remplace pour obtenir une autre circulation.
+
+```sh
+./launch/run_linux.sh -- pointe
+./launch/run_linux.sh -- pointe --seed 12
+```
+
+Pour comparer l'effet de la charge et des pannes sur les performances,
+`--compare` joue tous ces scénarios l'un après l'autre (environ 3 minutes).
+Chacun s'affiche comme une exécution classique (journal, rapport du réseau,
+bilan des arrivées et des pannes), suivi de sa ligne de résultat. Un tableau
+final les compare : véhicules rechargés et refusés, pannes, recharges
+interrompues, attente moyenne, taux d'occupation, chiffre d'affaires.
+`--quiet` n'affiche que ce tableau.
+
+Avec `--all`, la comparaison joue aussi les 4 scénarios scriptés (`standard`,
+`panne`, `affluence`, `petit`), marqués « scripté » dans la colonne Type. Leurs
+réseaux et leurs véhicules diffèrent : ils démontrent un mécanisme (file,
+annulation, panne) et leurs chiffres ne se comparent pas directement à ceux
+des scénarios aléatoires, qui partagent tous le même réseau.
+
+```sh
+./launch/run_linux.sh -- --compare
+./launch/run_linux.sh -- --compare --quiet
+./launch/run_linux.sh -- --compare --all
+```
+
+### Ajouter un scénario
+
+Créez un fichier dans `src/scenarios/` avec sa configuration de stations, de
+véhicules et d'événements scriptés, et/ou une configuration d'arrivées
+aléatoires (`struct GeneratorConfig`) et de pannes (`struct
+FaultSimulatorConfig`). Ajoutez-le ensuite à `src/CMakeLists.txt` et
+enregistrez-le dans `src/scenarios.c`.
 
 Pour compiler, exécuter tous les tests unitaires, puis lancer cette simulation :
 

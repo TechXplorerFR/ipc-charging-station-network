@@ -446,33 +446,46 @@ void runServer(struct Server* server) {
     }
 }
 
-void printServerReport(struct Server* server) {
-    printf("========== Rapport du réseau ==========\n");
-    int servedFromQueue = 0;
+struct ServerSummary summarizeServer(struct Server* server) {
+    struct ServerSummary summary = { .servedVehicles = server->stats.assignedWithoutWaiting };
     double totalWaitSeconds = 0.0;
+    double totalOccupancy = 0.0;
     for (int s = 0; s < server->numStations; s++) {
         struct Station* station = &server->stations[s];
-        printStation(station);
-        struct HistorySummary stationSummary = summarizeHistory(&server->history, s);
-        printf("  Chiffre d'affaires : %.2f € sur %d session(s)\n", stationSummary.revenue, stationSummary.sessions);
+        totalOccupancy += stationOccupancyRate(station);
 
         lockStation(station);
-        servedFromQueue += station->waitQueue.stats.served;
+        summary.servedVehicles += station->waitQueue.stats.served;
         totalWaitSeconds += station->waitQueue.stats.totalServedWaitSeconds;
         unlockStation(station);
     }
 
     // Les véhicules servis immédiatement comptent pour une attente nulle
+    summary.averageWaitSeconds = summary.servedVehicles > 0 ? totalWaitSeconds / summary.servedVehicles : 0.0;
+    summary.occupancyRate = server->numStations > 0 ? totalOccupancy / server->numStations : 0.0;
+    summary.history = summarizeHistory(&server->history, ALL_STATIONS);
+    return summary;
+}
+
+void printServerReport(struct Server* server) {
+    printf("========== Rapport du réseau ==========\n");
+    for (int s = 0; s < server->numStations; s++) {
+        struct Station* station = &server->stations[s];
+        printStation(station);
+        struct HistorySummary stationSummary = summarizeHistory(&server->history, s);
+        printf("  Chiffre d'affaires : %.2f € sur %d session(s)\n", stationSummary.revenue, stationSummary.sessions);
+    }
+
     const struct ServerStats* stats = &server->stats;
-    int servedVehicles = servedFromQueue + stats->assignedWithoutWaiting;
+    struct ServerSummary summary = summarizeServer(server);
     printf("Recharges terminées : %d, interrompues par une panne : %d\n", stats->completedCharges,
            stats->interruptedCharges);
     printf("Énergie délivrée : %.1f kWh\n", stats->deliveredEnergyKWh);
-    struct HistorySummary networkSummary = summarizeHistory(&server->history, ALL_STATIONS);
-    printf("Chiffre d'affaires : %.2f € (%.2f € par session en moyenne)\n", networkSummary.revenue,
-           networkSummary.sessions > 0 ? networkSummary.revenue / networkSummary.sessions : 0.0);
+    printf("Chiffre d'affaires : %.2f € (%.2f € par session en moyenne)\n", summary.history.revenue,
+           summary.history.sessions > 0 ? summary.history.revenue / summary.history.sessions : 0.0);
+    printf("Taux d'occupation moyen des bornes : %.1f %%\n", summary.occupancyRate * 100.0);
     printf("Temps d'attente moyen : %.1f min sur %d véhicule(s) servi(s)\n",
-           simulatedMinutes(servedVehicles > 0 ? totalWaitSeconds / servedVehicles : 0.0), servedVehicles);
+           simulatedMinutes(summary.averageWaitSeconds), summary.servedVehicles);
     printf("Pannes : %d, réparations : %d, redirections vers une autre station : %d\n", stats->faults,
            stats->repairs, stats->redirections);
     printf("Refus : %d, requêtes reçues : %d (dont %d incohérentes)\n", stats->refused, stats->requests,
